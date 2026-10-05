@@ -1,5 +1,5 @@
 import { ROUTES_AREA, SIDEBAR_NAV_AREA, host, useQuery } from '@hermes/plugin-sdk'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const VIEWS = [
@@ -8,6 +8,11 @@ const VIEWS = [
   ['diff', 'Diff'],
   ['raw', 'Raw'],
   ['verify', 'Verify']
+]
+
+const STORED_TARGETS = [
+  ['memory', 'Memory'],
+  ['user', 'User']
 ]
 
 function recordLabel(record) {
@@ -99,7 +104,7 @@ function OverviewView({ detail }) {
   })
 }
 
-function MemoryReviewPage({ loadRecords, loadDetail, runDecision, source }) {
+function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState('')
   const [view, setView] = useState('overview')
@@ -399,14 +404,284 @@ function MemoryReviewPage({ loadRecords, loadDetail, runDecision, source }) {
   })
 }
 
+function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
+  const [target, setTarget] = useState('memory')
+  const [search, setSearch] = useState('')
+  const [selectedText, setSelectedText] = useState('')
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [feedback, setFeedback] = useState(null)
+
+  const stored = useQuery({
+    queryKey: [source, 'stored-memory'],
+    queryFn: loadStoredMemory,
+    refetchInterval: 5_000
+  })
+
+  const targetData = stored.data?.targets?.[target] || { count: 0, entries: [] }
+  const entries = targetData.entries || []
+  const query = search.trim().toLocaleLowerCase()
+  const filtered = useMemo(
+    () =>
+      query
+        ? entries.filter(entry => String(entry.content || '').toLocaleLowerCase().includes(query))
+        : entries,
+    [entries, query]
+  )
+  const selectedEntry = selectedText ? entries.find(entry => entry.content === selectedText) : null
+  const current = selectedText
+    ? selectedEntry || { index: -1, content: selectedText, stale: true }
+    : filtered[0] || entries[0] || null
+
+  useEffect(() => {
+    setDraft(current?.content || '')
+  }, [target, current?.content])
+
+  const selectTarget = nextTarget => {
+    setTarget(nextTarget)
+    setSelectedText('')
+    setSearch('')
+    setFeedback(null)
+  }
+
+  const save = async () => {
+    if (!current) return
+    setSaving(true)
+    setFeedback(null)
+    try {
+      const result = await saveStoredMemory(target, current.content, draft)
+      setFeedback({ kind: 'success', message: result?.result?.message || 'Memory entry updated.' })
+      setSelectedText(draft.trim())
+      await stored.refetch()
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (stored.isError) {
+    return jsxs('div', {
+      className: 'flex h-full flex-col items-center justify-center gap-3 p-8 text-center',
+      children: [
+        jsx('div', { className: 'text-base font-medium', children: 'Stored memory unavailable' }),
+        jsx('div', {
+          className: 'max-w-lg text-sm text-(--ui-text-tertiary)',
+          children: 'Enable the Agent half of memory-review for this profile, then retry.'
+        }),
+        jsx('button', {
+          type: 'button',
+          className: 'rounded border border-(--ui-stroke-secondary) px-3 py-1.5 text-sm hover:bg-(--chrome-action-hover)',
+          onClick: () => stored.refetch(),
+          children: 'Retry'
+        })
+      ]
+    })
+  }
+
+  return jsxs('div', {
+    className: 'flex h-full min-h-0 flex-col',
+    children: [
+      jsxs('header', {
+        className: 'flex flex-wrap items-center gap-3 border-b border-(--ui-stroke-secondary) px-4 py-3',
+        children: [
+          jsxs('div', {
+            className: 'min-w-0 flex-1',
+            children: [
+              jsx('h1', { className: 'text-base font-semibold', children: 'Stored memory' }),
+              jsx('p', {
+                className: 'text-xs text-(--ui-text-tertiary)',
+                children: 'Inspect and edit Hermes built-in memory entries'
+              })
+            ]
+          }),
+          jsx('span', {
+            className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
+            children: `${targetData.count ?? 0} entries`
+          }),
+          jsx('button', {
+            type: 'button',
+            className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs hover:bg-(--chrome-action-hover)',
+            onClick: () => stored.refetch(),
+            children: stored.isFetching ? 'Refreshing…' : 'Refresh'
+          })
+        ]
+      }),
+      jsx('div', {
+        className: 'flex flex-wrap gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
+        children: STORED_TARGETS.map(([id, label]) =>
+          jsx('button', {
+            type: 'button',
+            onClick: () => selectTarget(id),
+            'aria-pressed': target === id,
+            className: `rounded px-2.5 py-1 text-xs ${
+              target === id
+                ? 'bg-(--chrome-action-hover) font-medium'
+                : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
+            }`,
+            children: label
+          }, id)
+        )
+      }),
+      feedback
+        ? jsx('div', {
+            className: `border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs ${
+              feedback.kind === 'error' ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'
+            }`,
+            children: feedback.message
+          })
+        : null,
+      jsxs('div', {
+        className: 'grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(15rem,22rem)_1fr]',
+        children: [
+          jsxs('aside', {
+            className: 'flex min-h-0 flex-col border-b border-(--ui-stroke-secondary) md:border-b-0 md:border-r',
+            children: [
+              jsx('div', {
+                className: 'p-3',
+                children: jsx('input', {
+                  type: 'search',
+                  value: search,
+                  onChange: event => setSearch(event.target.value),
+                  placeholder: 'Search stored memory',
+                  'aria-label': 'Search stored memory',
+                  className: 'w-full rounded border border-(--ui-stroke-secondary) bg-transparent px-2.5 py-1.5 text-sm outline-none focus:border-(--ui-accent)'
+                })
+              }),
+              stored.isLoading
+                ? jsx('div', { className: 'p-4 text-sm text-(--ui-text-tertiary)', children: 'Loading…' })
+                : filtered.length === 0
+                  ? jsx('div', {
+                      className: 'p-4 text-sm text-(--ui-text-tertiary)',
+                      children: entries.length ? 'No matches.' : `No ${target} entries.`
+                    })
+                  : jsx('div', {
+                      className: 'min-h-0 flex-1 overflow-auto px-2 pb-2',
+                      children: filtered.map(entry =>
+                        jsx('button', {
+                          type: 'button',
+                          onClick: () => setSelectedText(entry.content),
+                          className: `mb-1 block w-full rounded px-2.5 py-2 text-left transition-colors ${
+                            current?.content === entry.content
+                              ? 'bg-(--chrome-action-hover)'
+                              : 'hover:bg-(--chrome-action-hover)'
+                          }`,
+                          children: jsx('div', {
+                            className: 'line-clamp-3 whitespace-pre-wrap break-words text-xs text-(--ui-text-tertiary)',
+                            children: entry.content || '(empty entry)'
+                          })
+                        }, `${target}:${entry.index}`)
+                      )
+                    })
+            ]
+          }),
+          current
+            ? jsxs('main', {
+                className: 'flex min-h-0 min-w-0 flex-col',
+                children: [
+                  jsxs('div', {
+                    className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-2',
+                    children: [
+                      jsx('span', {
+                        className: 'mr-auto text-xs text-(--ui-text-tertiary)',
+                        children: current.stale
+                          ? `${target === 'memory' ? 'MEMORY.md' : 'USER.md'} entry changed externally`
+                          : `${target === 'memory' ? 'MEMORY.md' : 'USER.md'} entry ${current.index + 1}`
+                      }),
+                      jsx('button', {
+                        type: 'button',
+                        disabled: saving || draft === current.content,
+                        onClick: save,
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: saving ? 'Saving…' : 'Save changes'
+                      })
+                    ]
+                  }),
+                  jsx('textarea', {
+                    value: draft,
+                    onChange: event => setDraft(event.target.value),
+                    'aria-label': `Edit ${target} memory entry`,
+                    className: 'min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed outline-none',
+                    spellCheck: false
+                  }),
+                  current.stale
+                    ? jsx('div', {
+                        className: 'border-t border-(--ui-stroke-secondary) px-4 py-2 text-xs text-(--ui-danger,#f87171)',
+                        children: 'This entry changed on disk. Your draft is preserved; saving it will be checked against the original entry and may be rejected as stale.'
+                      })
+                    : null,
+                  jsx('div', {
+                    className: 'border-t border-(--ui-stroke-secondary) px-4 py-2 text-xs text-(--ui-text-tertiary)',
+                    children: 'Saving delegates to Hermes MemoryStore validation, locking, drift detection, and atomic persistence.'
+                  })
+                ]
+              })
+            : jsx('div', {
+                className: 'flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-(--ui-text-tertiary)',
+                children: `No ${target} entry selected.`
+              })
+        ]
+      })
+    ]
+  })
+}
+
+function MemoryReviewPage(props) {
+  const [mode, setMode] = useState('pending')
+  return jsxs('div', {
+    className: 'flex h-full min-h-0 flex-col',
+    children: [
+      jsx('div', {
+        className: 'flex gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
+        children: [
+          ['pending', 'Pending writes'],
+          ['stored', 'Stored memory']
+        ].map(([id, label]) =>
+          jsx('button', {
+            type: 'button',
+            onClick: () => setMode(id),
+            'aria-pressed': mode === id,
+            className: `rounded px-3 py-1.5 text-xs ${
+              mode === id
+                ? 'bg-(--chrome-action-hover) font-medium'
+                : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
+            }`,
+            children: label
+          }, id)
+        )
+      }),
+      jsx('div', {
+        className: 'min-h-0 flex-1',
+        children:
+          mode === 'pending'
+            ? jsx(PendingWritesPage, props)
+            : jsx(StoredMemoryPage, {
+                loadStoredMemory: props.loadStoredMemory,
+                saveStoredMemory: props.saveStoredMemory,
+                source: props.source
+              })
+      })
+    ]
+  })
+}
+
 export default {
   id: 'memory-review',
   name: 'Memory Review',
-  description: 'Review, approve, or reject pending Hermes memory proposals.',
+  description: 'Review pending Hermes memory proposals and inspect or edit stored memory.',
   defaultEnabled: false,
   register(ctx) {
     const loadRecords = () => ctx.rest('/records')
     const loadDetail = id => ctx.rest(`/records/${encodeURIComponent(id)}`)
+    const loadStoredMemory = () => ctx.rest('/memory')
+    const saveStoredMemory = (target, oldText, content) =>
+      ctx.rest(`/memory/${encodeURIComponent(target)}`, {
+        method: 'PUT',
+        body: { old_text: oldText, content }
+      })
     const runDecision = async (action, target) => {
       const activeSessionId = host.state.activeSessionId.get()
       const focusedSessionId = host.state.focusedSessionId.get()
@@ -425,7 +700,15 @@ export default {
         id: 'page',
         area: ROUTES_AREA,
         data: { path: '/memory-review' },
-        render: () => jsx(MemoryReviewPage, { loadRecords, loadDetail, runDecision, source: ctx.source })
+        render: () =>
+          jsx(MemoryReviewPage, {
+            loadRecords,
+            loadDetail,
+            loadStoredMemory,
+            saveStoredMemory,
+            runDecision,
+            source: ctx.source
+          })
       },
       {
         id: 'nav',

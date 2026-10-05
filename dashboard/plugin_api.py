@@ -1,9 +1,9 @@
-"""Structured read backend for Hermes Memory Review.
+"""Structured backend for Hermes Memory Review.
 
 Hermes mounts this router below ``/api/plugins/memory-review`` and scopes the
-request to the active profile. The module intentionally exposes GET routes
-only; Desktop decisions are delegated to Hermes' native ``/memory`` command
-path through the documented Desktop Plugin SDK.
+request to the active profile. Pending-write decisions are delegated to Hermes'
+native ``/memory`` command path through the documented Desktop Plugin SDK.
+Stored-memory edits delegate persistence to Hermes' own ``MemoryStore``.
 """
 
 from __future__ import annotations
@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 
 _PLUGIN_ID = "memory-review"
@@ -22,6 +23,11 @@ MemoryReview = _core["MemoryReview"]
 resolve_hermes_home = _core["resolve_hermes_home"]
 
 router = APIRouter()
+
+
+class MemoryEditRequest(BaseModel):
+    old_text: str
+    content: str
 
 
 def _settings() -> Dict[str, Any]:
@@ -55,6 +61,24 @@ def _review() -> Any:
         default_page_size=max(1, int(settings.get("default_page_size") or 20)),
         max_page_size=max(1, int(settings.get("max_page_size") or 100)),
     )
+
+
+def _memory_store() -> Any:
+    """Load the active profile's built-in memory with Hermes' native safeguards."""
+    from tools.memory_tool import load_on_disk_store
+
+    return load_on_disk_store()
+
+
+def _memory_target(store: Any, target: str) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
+    entries = store.memory_entries if target == "memory" else store.user_entries
+    return {
+        "target": target,
+        "count": len(entries),
+        "entries": [{"index": index, "content": entry} for index, entry in enumerate(entries)],
+    }
 
 
 def _record_summary(record: Any) -> Dict[str, Any]:
@@ -96,4 +120,32 @@ def record_detail(selector: str) -> Dict[str, Any]:
         "diff": review.diff(record.id),
         "raw": review.raw(record.id),
         "verify": review.verify(record.id),
+    }
+
+
+@router.get("/memory")
+def stored_memory() -> Dict[str, Any]:
+    store = _memory_store()
+    return {
+        "targets": {
+            "memory": _memory_target(store, "memory"),
+            "user": _memory_target(store, "user"),
+        }
+    }
+
+
+@router.put("/memory/{target}")
+def replace_stored_memory(target: str, body: MemoryEditRequest) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
+
+    store = _memory_store()
+    result = store.replace(target, body.old_text, body.content, matched_entry=body.old_text)
+    if not result.get("success"):
+        raise HTTPException(status_code=409, detail=result)
+
+    return {
+        "success": True,
+        "result": result,
+        "target": _memory_target(store, target),
     }

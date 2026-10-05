@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.0 — 2026-10-05
+
+- Added a top-level switch between pending writes and stored memory.
+- Added Memory and User views that list every built-in `MEMORY.md` and `USER.md` entry with search and refresh.
+- Added direct editing of existing stored entries from Desktop.
+- Added structured stored-memory GET/PUT backend routes that delegate replacements to Hermes `MemoryStore` with the exact original entry pinned for stale-write protection.
+- Preserved all v1.3 pending-review controls and native `/memory approve|reject` decision paths.
+
 ## 1.3.0 — 2026-10-05
 
 - Added a formatted Overview as the default record view, with readable metadata and proposed content/change blocks.

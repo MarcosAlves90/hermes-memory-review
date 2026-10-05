@@ -59,6 +59,8 @@ def test_unified_desktop_package_uses_documented_surfaces():
     assert "SIDEBAR_NAV_AREA" in source
     assert "data: { path: '/memory-review'" in source
     assert "ctx.rest('/records')" in source
+    assert "ctx.rest('/memory')" in source
+    assert "method: 'PUT'" in source
     assert "refetchInterval" in source
     assert "querySelector" not in source
     assert "document." not in source
@@ -117,13 +119,100 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
     assert "OK abc123" in data["verify"]
 
 
-def test_backend_remains_read_only(monkeypatch, tmp_path):
-    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+class FakeMemoryStore:
+    def __init__(self, memory=None, user=None, replace_result=None):
+        self.memory_entries = list(memory or [])
+        self.user_entries = list(user or [])
+        self.replace_result = replace_result
+        self.calls = []
+
+    def replace(self, target, old_text, content, matched_entry=None):
+        self.calls.append((target, old_text, content, matched_entry))
+        if self.replace_result is not None:
+            return self.replace_result
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        index = entries.index(matched_entry)
+        entries[index] = content
+        return {"success": True, "message": "Entry replaced.", "replaced_entry": old_text}
+
+
+def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
     api = load_api()
-    methods = set()
-    for route in api.router.routes:
-        methods.update(route.methods or set())
-    assert methods <= {"GET"}
+    store = FakeMemoryStore(memory=["agent note", "second note"], user=["user profile"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).get("/memory")
+    assert response.status_code == 200
+    assert response.json() == {
+        "targets": {
+            "memory": {
+                "target": "memory",
+                "count": 2,
+                "entries": [
+                    {"index": 0, "content": "agent note"},
+                    {"index": 1, "content": "second note"},
+                ],
+            },
+            "user": {
+                "target": "user",
+                "count": 1,
+                "entries": [{"index": 0, "content": "user profile"}],
+            },
+        }
+    }
+
+
+def test_backend_replaces_exact_stored_memory_entry(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["old entry"], user=["profile"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).put(
+        "/memory/memory",
+        json={"old_text": "old entry", "content": "new entry"},
+    )
+    assert response.status_code == 200
+    assert store.calls == [("memory", "old entry", "new entry", "old entry")]
+    body = response.json()
+    assert body["success"] is True
+    assert body["target"]["entries"] == [{"index": 0, "content": "new entry"}]
+
+
+def test_backend_rejects_invalid_stored_memory_target(monkeypatch):
+    api = load_api()
+    monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore())
+    response = client_for(api).put(
+        "/memory/other",
+        json={"old_text": "old", "content": "new"},
+    )
+    assert response.status_code == 400
+    assert response.json()["detail"] == "target must be 'memory' or 'user'."
+
+
+def test_backend_surfaces_memory_store_failure_without_success(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(
+        memory=["old entry"],
+        replace_result={"success": False, "error": "Entry changed since it was reviewed."},
+    )
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    response = client_for(api).put(
+        "/memory/memory",
+        json={"old_text": "old entry", "content": "new entry"},
+    )
+    assert response.status_code == 409
+    assert response.json()["detail"]["success"] is False
+    assert "changed" in response.json()["detail"]["error"]
+
+
+def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
+    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
+    assert "Pending writes" in source
+    assert "Stored memory" in source
+    assert "['memory', 'Memory']" in source
+    assert "['user', 'User']" in source
+    assert "Save changes" in source
+    assert "Search stored memory" in source
 
 
 def test_backend_returns_not_found_for_unknown_record(monkeypatch, tmp_path):
