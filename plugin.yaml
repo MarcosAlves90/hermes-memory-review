@@ -1,0 +1,23 @@
+name: memory-review
+version: 1.1.0
+manifest_version: 2
+api_version: 1
+description: "Read-only inspection of pending Hermes memory writes, including full payloads, diffs, search, statistics, and validation."
+license: MIT
+tags: [memory, review, approval, diagnostics]
+config_schema:
+  home_override:
+    type: str
+    default: ""
+    label: "Hermes home override"
+    description: "Optional absolute HERMES_HOME for unusual/custom profile layouts. Leave empty for automatic profile resolution."
+  default_page_size:
+    type: int
+    default: 20
+    label: "Default page size"
+    description: "Number of pending records shown by list when no explicit limit is supplied."
+  max_page_size:
+    type: int
+    default: 100
+    label: "Maximum page size"
+    description: "Upper bound for list/find result counts."
