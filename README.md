@@ -1,7 +1,21 @@
-# Hermes Memory Review 1.1.0
+# Hermes Memory Review 1.2.0
 
 Read-only Hermes plugin for inspecting pending memory proposals in full when
 `/memory pending` only exposes the short staged summary.
+
+## Desktop
+
+Version 1.2.0 adds a native **Memory Review** page to Hermes Desktop. After the
+plugin is installed, enable both halves independently:
+
+1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
+2. Enable the Desktop **Memory Review** plugin in the same Plugins screen.
+3. Open **Memory Review** from the Desktop sidebar.
+
+The page lists pending writes, supports local search and refresh, and provides
+the same **Proposal**, **Diff**, **Raw**, and **Verify** read-only views as the
+session/CLI commands. It polls every five seconds so changes remain visible even
+when a live plugin socket is unavailable.
 
 ## Commands
 
@@ -36,37 +50,24 @@ impose their own message limits.
 ## Install
 
 ```bash
-unzip hermes-memory-review-1.1.0-polis-v6.10.0.zip
-cd hermes-memory-review-1.1.0
-./install.sh
+hermes plugins install https://github.com/MarcosAlves90/hermes-memory-review
+hermes plugins enable memory-review
 ```
 
-For a named/custom Hermes profile:
-
-```bash
-./install.sh --home "$HOME/.hermes/profiles/<profile>"
-```
-
-After installation, restart or reload the long-running Hermes process.
+For Desktop, use **Capabilities → Plugins → Rescan** if the app was already
+open, then enable the Desktop half separately. Hermes keeps the Agent and
+Desktop enable switches independent by design.
 
 ## Local verification
-
-```bash
-./verify.sh --unit
-```
-
-This checks Python syntax, runs the test suite, and enforces Cobertura line
-coverage above 95%.
-
-Development verification requires `pytest` and `coverage.py`; the installed plugin itself uses only the Python standard library plus Hermes.
-
-If the `hermes` executable is installed:
 
 ```bash
 ./verify.sh
 ```
 
-also runs `hermes plugins doctor memory-review --ci`.
+This checks Python syntax, runs the test suite, and enforces Cobertura line
+coverage above 95%, then runs the same `hermes plugins validate --install-deps`
+admission check used by the Hermes catalog. Test dependencies are isolated by
+`uv`; the installed plugin itself uses Hermes plus the Python standard library.
 
 ## Safety model
 
@@ -84,11 +85,5 @@ Native Hermes remains responsible for mutations:
 
 ## POLIS
 
-Version 1.1.0 is prepared as a planned POLIS V6.10.0
-`behavior_preserving` release with strict tests and coverage. See
-`polis/VALIDATION.md`. The distribution wrapper also includes external,
-machine-readable POLIS evidence and the verified `.polis` artifact.
-
-The runtime plugin implementation is byte-identical to the locked 1.0.0
-baseline; this release hardens validation, release metadata, and handoff
-documentation.
+Version 1.2.0 is developed under a strict POLIS V6.10.0 `feature` contract with
+captured Red→Green proof, complete tests, and Cobertura coverage above 95%.
