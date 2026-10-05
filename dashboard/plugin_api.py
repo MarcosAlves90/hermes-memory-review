@@ -1,8 +1,9 @@
-"""Read-only Desktop backend for Hermes Memory Review.
+"""Structured read backend for Hermes Memory Review.
 
 Hermes mounts this router below ``/api/plugins/memory-review`` and scopes the
 request to the active profile. The module intentionally exposes GET routes
-only; memory approval and rejection remain owned by Hermes core.
+only; Desktop decisions are delegated to Hermes' native ``/memory`` command
+path through the documented Desktop Plugin SDK.
 """
 
 from __future__ import annotations
@@ -90,6 +91,7 @@ def record_detail(selector: str) -> Dict[str, Any]:
     return {
         "id": record.id,
         "record": _record_summary(record),
+        "payload": record.payload,
         "proposal": review.show(record.id),
         "diff": review.diff(record.id),
         "raw": review.raw(record.id),

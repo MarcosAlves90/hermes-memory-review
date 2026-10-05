@@ -308,7 +308,8 @@ Terminal:
   hermes memory-review <same subcommands>
   Example: hermes memory-review raw newest | less
 
-This plugin never approves/rejects/changes memory. Use Hermes native:
+These inspector commands never approve/reject/change memory. The Desktop page
+delegates decisions to Hermes native commands:
   /memory approve <id>
   /memory reject <id>
 """

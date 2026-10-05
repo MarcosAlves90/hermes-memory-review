@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0 — 2026-10-05
+
+- Added a formatted Overview as the default record view, with readable metadata and proposed content/change blocks.
+- Added individual Approve and Reject controls backed by Hermes' documented `slash.exec` `/memory` command path.
+- Added Approve all and Reject all with an explicit confirmation step before bulk mutation.
+- Kept the plugin backend GET-only; Hermes core remains authoritative for applying or discarding staged memory writes.
+- Added structured payload data to the detail endpoint for the Overview renderer.
+
 ## 1.2.0 — 2026-10-05
 
 - Added a native Hermes Desktop **Memory Review** page and sidebar entry.

@@ -64,6 +64,16 @@ def test_unified_desktop_package_uses_documented_surfaces():
     assert "document." not in source
 
 
+def test_desktop_decisions_use_native_hermes_memory_commands():
+    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
+    assert "host.request('slash.exec'" in source, "desktop decision actions must use Hermes slash.exec"
+    assert "command: `/memory ${action} ${target}`" in source
+    assert "['overview', 'Overview']" in source
+    assert "useState('overview')" in source
+    assert "Approve all" in source and "Reject all" in source
+    assert "Confirm ${bulkConfirm} all" in source
+
+
 def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
     stage(
         tmp_path,
@@ -94,13 +104,20 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
     assert detail.status_code == 200
     data = detail.json()
     assert data["id"] == "abc123"
+    assert data["payload"] == {
+        "action": "replace",
+        "target": "memory",
+        "old_text": "old",
+        "matched_entry": "old",
+        "content": "new",
+    }
     assert "Pending memory write abc123" in data["proposal"]
     assert "old" in data["diff"] and "new" in data["diff"]
     assert '"id": "abc123"' in data["raw"]
     assert "OK abc123" in data["verify"]
 
 
-def test_backend_is_read_only(monkeypatch, tmp_path):
+def test_backend_remains_read_only(monkeypatch, tmp_path):
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     api = load_api()
     methods = set()

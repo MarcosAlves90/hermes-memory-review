@@ -1,21 +1,24 @@
-# Hermes Memory Review 1.2.0
+# Hermes Memory Review 1.3.0
 
-Read-only Hermes plugin for inspecting pending memory proposals in full when
-`/memory pending` only exposes the short staged summary.
+Hermes plugin for reviewing pending memory proposals in full and resolving them
+from Hermes Desktop through Hermes' native approval commands.
 
 ## Desktop
 
-Version 1.2.0 adds a native **Memory Review** page to Hermes Desktop. After the
+Version 1.3.0 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
 2. Enable the Desktop **Memory Review** plugin in the same Plugins screen.
 3. Open **Memory Review** from the Desktop sidebar.
 
-The page lists pending writes, supports local search and refresh, and provides
-the same **Proposal**, **Diff**, **Raw**, and **Verify** read-only views as the
-session/CLI commands. It polls every five seconds so changes remain visible even
-when a live plugin socket is unavailable.
+The page lists pending writes, supports local search and refresh, and opens on a
+formatted **Overview** that presents metadata and proposed changes as readable
+fields. **Proposal**, **Diff**, **Raw**, and **Verify** remain available for
+technical inspection. Each pending write can be approved or rejected in place;
+**Approve all** and **Reject all** require an explicit confirmation click. It
+polls every five seconds so changes remain visible even when a live plugin socket
+is unavailable.
 
 ## Commands
 
@@ -69,14 +72,17 @@ coverage above 95%, then runs the same `hermes plugins validate --install-deps`
 admission check used by the Hermes catalog. Test dependencies are isolated by
 `uv`; the installed plugin itself uses Hermes plus the Python standard library.
 
-## Safety model
+## Decision path
 
-The plugin is intentionally read-only. It reads only pending JSON records under
-the active profile's `pending/memory` directory. It never calls memory approval
-or rejection paths and never edits `MEMORY.md`, `USER.md`, or staged records.
-Rendered strings escape terminal control, ANSI, and bidi-control characters.
+The plugin backend remains read-only and reads pending JSON records under the
+active profile's `pending/memory` directory. Desktop approve/reject buttons do
+not edit those files directly: they call the documented Hermes Desktop SDK
+gateway path and execute Hermes' native `/memory approve|reject <id|all>`
+commands. Hermes core therefore remains responsible for applying or discarding
+pending writes. Rendered strings are escaped by React and the existing inspector
+continues sanitizing terminal/control/bidi characters in technical views.
 
-Native Hermes remains responsible for mutations:
+The equivalent native commands are:
 
 ```text
 /memory approve <id>
@@ -85,5 +91,5 @@ Native Hermes remains responsible for mutations:
 
 ## POLIS
 
-Version 1.2.0 is developed under a strict POLIS V6.10.0 `feature` contract with
-captured Red→Green proof, complete tests, and Cobertura coverage above 95%.
+Version 1.3.0 is validated under a strict POLIS V6.10.0 `feature` contract,
+complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

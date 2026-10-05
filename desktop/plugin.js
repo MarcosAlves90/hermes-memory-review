@@ -1,8 +1,9 @@
-import { ROUTES_AREA, SIDEBAR_NAV_AREA, useQuery } from '@hermes/plugin-sdk'
+import { ROUTES_AREA, SIDEBAR_NAV_AREA, host, useQuery } from '@hermes/plugin-sdk'
 import { useMemo, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
 const VIEWS = [
+  ['overview', 'Overview'],
   ['proposal', 'Proposal'],
   ['diff', 'Diff'],
   ['raw', 'Raw'],
@@ -13,10 +14,98 @@ function recordLabel(record) {
   return `${record.action}/${record.target}`
 }
 
-function MemoryReviewPage({ loadRecords, loadDetail, source }) {
+function formatCreated(value) {
+  const date = new Date(Number(value || 0) * 1000)
+  return Number.isNaN(date.getTime()) ? 'Unknown' : date.toLocaleString()
+}
+
+function MetaField({ label, value }) {
+  return jsxs('div', {
+    className: 'min-w-0 rounded border border-(--ui-stroke-secondary) p-2.5',
+    children: [
+      jsx('div', { className: 'text-[0.6875rem] uppercase tracking-wide text-(--ui-text-tertiary)', children: label }),
+      jsx('div', { className: 'mt-1 break-words text-sm', children: value || '—' })
+    ]
+  })
+}
+
+function ContentBlock({ label, text }) {
+  if (!text) return null
+  return jsxs('section', {
+    className: 'mt-3',
+    children: [
+      jsx('h4', { className: 'mb-1 text-xs font-medium text-(--ui-text-tertiary)', children: label }),
+      jsx('div', {
+        className: 'whitespace-pre-wrap break-words rounded border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-3 text-sm leading-relaxed',
+        children: String(text)
+      })
+    ]
+  })
+}
+
+function OperationCard({ op, index, total }) {
+  const action = String(op?.action || 'unknown')
+  const title = total > 1 ? `Operation ${index + 1} · ${action}` : action
+  const before = op?.matched_entry || op?.old_text || ''
+  const content = op?.content || ''
+
+  return jsxs('section', {
+    className: 'rounded border border-(--ui-stroke-secondary) p-3',
+    children: [
+      jsx('h3', { className: 'text-sm font-semibold capitalize', children: title }),
+      action === 'add' ? jsx(ContentBlock, { label: 'Content to add', text: content }) : null,
+      action === 'replace' ? jsx(ContentBlock, { label: 'Current entry', text: before }) : null,
+      action === 'replace' ? jsx(ContentBlock, { label: 'Replacement', text: content }) : null,
+      action === 'remove' ? jsx(ContentBlock, { label: 'Entry to remove', text: before }) : null,
+      !['add', 'replace', 'remove'].includes(action)
+        ? jsx('pre', {
+            className: 'mt-3 overflow-auto whitespace-pre-wrap break-words rounded border border-(--ui-stroke-secondary) p-3 font-mono text-xs',
+            children: JSON.stringify(op, null, 2)
+          })
+        : null
+    ]
+  })
+}
+
+function OverviewView({ detail }) {
+  const record = detail.record || {}
+  const payload = detail.payload || {}
+  const operations = payload.action === 'batch' && Array.isArray(payload.operations) ? payload.operations : [payload]
+
+  return jsxs('div', {
+    className: 'min-h-0 flex-1 overflow-auto p-4',
+    children: [
+      jsx('div', {
+        className: 'grid gap-2 sm:grid-cols-2 xl:grid-cols-4',
+        children: [
+          jsx(MetaField, { label: 'Action', value: record.action }, 'action'),
+          jsx(MetaField, { label: 'Target', value: record.target }, 'target'),
+          jsx(MetaField, { label: 'Origin', value: record.origin }, 'origin'),
+          jsx(MetaField, { label: 'Created', value: formatCreated(record.created_at) }, 'created')
+        ]
+      }),
+      jsxs('section', {
+        className: 'mt-4',
+        children: [
+          jsx('h3', { className: 'mb-1 text-xs font-medium text-(--ui-text-tertiary)', children: 'Summary' }),
+          jsx('div', { className: 'text-sm leading-relaxed', children: record.summary || '(no summary)' })
+        ]
+      }),
+      jsx('div', {
+        className: 'mt-4 grid gap-3',
+        children: operations.map((op, index) => jsx(OperationCard, { op, index, total: operations.length }, index))
+      })
+    ]
+  })
+}
+
+function MemoryReviewPage({ loadRecords, loadDetail, runDecision, source }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState('')
-  const [view, setView] = useState('proposal')
+  const [view, setView] = useState('overview')
+  const [busyAction, setBusyAction] = useState('')
+  const [feedback, setFeedback] = useState(null)
+  const [bulkConfirm, setBulkConfirm] = useState('')
 
   const listing = useQuery({
     queryKey: [source, 'records'],
@@ -55,6 +144,26 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
     if (currentId) detail.refetch()
   }
 
+  const decide = async (action, target) => {
+    const key = `${action}:${target}`
+    setBusyAction(key)
+    setFeedback(null)
+    try {
+      const result = await runDecision(action, target)
+      setFeedback({ kind: 'success', message: result?.output || `${action} completed.` })
+      setSelected('')
+      setBulkConfirm('')
+      await listing.refetch()
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setBusyAction('')
+    }
+  }
+
   if (listing.isError) {
     return jsxs('div', {
       className: 'flex h-full flex-col items-center justify-center gap-3 p-8 text-center',
@@ -86,7 +195,7 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
               jsx('h1', { className: 'text-base font-semibold', children: 'Memory Review' }),
               jsx('p', {
                 className: 'text-xs text-(--ui-text-tertiary)',
-                children: 'Read-only inspection of pending Hermes memory writes'
+                children: 'Review and resolve pending Hermes memory writes'
               })
             ]
           }),
@@ -102,6 +211,54 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
           })
         ]
       }),
+      records.length
+        ? bulkConfirm
+          ? jsxs('div', {
+              className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs',
+              children: [
+                jsx('span', {
+                  className: 'mr-auto text-(--ui-text-tertiary)',
+                  children: `${bulkConfirm === 'approve' ? 'Approve' : 'Reject'} all ${records.length} pending write(s)?`
+                }),
+                jsx('button', {
+                  type: 'button',
+                  disabled: Boolean(busyAction),
+                  onClick: () => decide(bulkConfirm, 'all'),
+                  className: `rounded border border-(--ui-stroke-secondary) px-2.5 py-1 ${
+                    bulkConfirm === 'reject' ? 'text-(--ui-danger,#f87171)' : ''
+                  } hover:bg-(--chrome-action-hover) disabled:opacity-50`,
+                  children: busyAction ? 'Working…' : `Confirm ${bulkConfirm} all`
+                }),
+                jsx('button', {
+                  type: 'button',
+                  disabled: Boolean(busyAction),
+                  onClick: () => setBulkConfirm(''),
+                  className: 'rounded px-2.5 py-1 text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                  children: 'Cancel'
+                })
+              ]
+            })
+          : jsxs('div', {
+              className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-2',
+              children: [
+                jsx('span', { className: 'mr-auto text-xs text-(--ui-text-tertiary)', children: 'Bulk actions' }),
+                jsx('button', {
+                  type: 'button',
+                  disabled: Boolean(busyAction),
+                  onClick: () => setBulkConfirm('approve'),
+                  className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                  children: 'Approve all'
+                }),
+                jsx('button', {
+                  type: 'button',
+                  disabled: Boolean(busyAction),
+                  onClick: () => setBulkConfirm('reject'),
+                  className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs text-(--ui-danger,#f87171) hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                  children: 'Reject all'
+                })
+              ]
+            })
+        : null,
       jsxs('div', {
         className: 'grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(15rem,22rem)_1fr]',
         children: [
@@ -170,19 +327,44 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
               currentId
                 ? jsxs('div', {
                     className: 'flex flex-wrap items-center gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
-                    children: VIEWS.map(([id, label]) =>
+                    children: [
+                      ...VIEWS.map(([id, label]) =>
+                        jsx('button', {
+                          type: 'button',
+                          onClick: () => setView(id),
+                          'aria-pressed': view === id,
+                          className: `rounded px-2.5 py-1 text-xs ${
+                            view === id
+                              ? 'bg-(--chrome-action-hover) font-medium'
+                              : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
+                          }`,
+                          children: label
+                        }, id)
+                      ),
+                      jsx('span', { className: 'min-w-2 flex-1' }),
                       jsx('button', {
                         type: 'button',
-                        onClick: () => setView(id),
-                        'aria-pressed': view === id,
-                        className: `rounded px-2.5 py-1 text-xs ${
-                          view === id
-                            ? 'bg-(--chrome-action-hover) font-medium'
-                            : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
-                        }`,
-                        children: label
-                      }, id)
-                    )
+                        disabled: Boolean(busyAction),
+                        onClick: () => decide('approve', currentId),
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: busyAction === `approve:${currentId}` ? 'Approving…' : 'Approve'
+                      }, 'approve'),
+                      jsx('button', {
+                        type: 'button',
+                        disabled: Boolean(busyAction),
+                        onClick: () => decide('reject', currentId),
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs text-(--ui-danger,#f87171) hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: busyAction === `reject:${currentId}` ? 'Rejecting…' : 'Reject'
+                      }, 'reject')
+                    ]
+                  })
+                : null,
+              feedback
+                ? jsx('div', {
+                    className: `border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs ${
+                      feedback.kind === 'error' ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'
+                    }`,
+                    children: feedback.message
                   })
                 : null,
               detail.isError
@@ -193,10 +375,12 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
                 : detail.isLoading && currentId
                   ? jsx('div', { className: 'p-4 text-sm text-(--ui-text-tertiary)', children: 'Loading record…' })
                   : currentId && detail.data
-                    ? jsx('pre', {
-                        className: 'min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed',
-                        children: detail.data[view] || ''
-                      })
+                    ? view === 'overview'
+                      ? jsx(OverviewView, { detail: detail.data })
+                      : jsx('pre', {
+                          className: 'min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed',
+                          children: detail.data[view] || ''
+                        })
                     : jsx('div', {
                         className: 'flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-(--ui-text-tertiary)',
                         children: 'Select a pending memory write to inspect it.'
@@ -218,18 +402,30 @@ function MemoryReviewPage({ loadRecords, loadDetail, source }) {
 export default {
   id: 'memory-review',
   name: 'Memory Review',
-  description: 'Read-only inspection of pending Hermes memory proposals.',
+  description: 'Review, approve, or reject pending Hermes memory proposals.',
   defaultEnabled: false,
   register(ctx) {
     const loadRecords = () => ctx.rest('/records')
     const loadDetail = id => ctx.rest(`/records/${encodeURIComponent(id)}`)
+    const runDecision = async (action, target) => {
+      const activeSessionId = host.state.activeSessionId.get()
+      const focusedSessionId = host.state.focusedSessionId.get()
+      const sessionId = focusedSessionId || activeSessionId
+      if (!sessionId) {
+        throw new Error('Open or focus a Hermes session before approving or rejecting memory.')
+      }
+      return host.request('slash.exec', {
+        session_id: sessionId,
+        command: `/memory ${action} ${target}`
+      })
+    }
 
     ctx.registerMany([
       {
         id: 'page',
         area: ROUTES_AREA,
         data: { path: '/memory-review' },
-        render: () => jsx(MemoryReviewPage, { loadRecords, loadDetail, source: ctx.source })
+        render: () => jsx(MemoryReviewPage, { loadRecords, loadDetail, runDecision, source: ctx.source })
       },
       {
         id: 'nav',
