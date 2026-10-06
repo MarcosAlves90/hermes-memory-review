@@ -199,12 +199,73 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     assert result["after_entry_count"] == 2
     assert result["reduction_percent"] >= 25
     call = llm.calls[0]
-    assert call["json_schema"]["properties"]["entries"]["maxItems"] == 2
+    assert "maxItems" not in call["json_schema"]["properties"]["entries"]
     instructions = call["instructions"].lower()
     assert "do not preserve source entry boundaries" in instructions
     assert "durable, actionable core" in instructions
     assert "examples" in instructions
     assert "at most 2 entries" in instructions
+
+
+def test_compaction_preview_retries_entry_count_outside_transport_schema(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = [
+        "User prefers concise answers and dislikes filler explanations.",
+        "User prefers direct answers with minimal repetition.",
+        "User is building Hermes Memory Review.",
+        "Hermes Memory Review is a plugin for reviewing stored memory.",
+        "The plugin should keep memory actions explicit and reviewable.",
+        "The plugin must not mutate stored memory before explicit apply.",
+        "User values technical precision in implementation discussions.",
+        "User wants implementation details to remain technically precise.",
+    ]
+    responses = [
+        [
+            "User prefers concise, direct answers.",
+            "Hermes Memory Review manages stored memory.",
+            "Memory changes stay explicit and reviewable.",
+        ],
+        [
+            "User prefers concise, direct, technically precise answers.",
+            "Hermes Memory Review keeps stored-memory changes explicit and reviewable.",
+        ],
+    ]
+
+    class HermesSchemaLlm:
+        def __init__(self):
+            self.calls = []
+
+        def complete_structured(self, **kwargs):
+            self.calls.append(kwargs)
+            entries = responses[len(self.calls) - 1]
+            max_items = kwargs["json_schema"]["properties"]["entries"].get("maxItems")
+            if max_items is not None and len(entries) > max_items:
+                raise ValueError(
+                    f"Plugin LLM structured output did not match schema: {entries!r} is too long"
+                )
+            return SimpleNamespace(
+                parsed={"entries": entries},
+                text=json.dumps({"entries": entries}),
+                provider="default-provider",
+                model="default-model",
+            )
+
+    llm = HermesSchemaLlm()
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["attempts"] == 2
+    assert result["before_entry_count"] == 8
+    assert result["after_entry_count"] == 2
+    assert len(llm.calls) == 2
+    assert "maxItems" not in llm.calls[0]["json_schema"]["properties"]["entries"]
+    assert "did not satisfy the compaction constraints" in llm.calls[1]["instructions"]
+
 
 
 def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):
