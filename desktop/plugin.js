@@ -79,6 +79,7 @@ function OverviewView({ detail }) {
 
   return jsxs('div', {
     className: 'min-h-0 flex-1 overflow-auto p-4',
+    'data-selectable-text': 'true',
     children: [
       jsx('div', {
         className: 'grid gap-2 sm:grid-cols-2 xl:grid-cols-4',
@@ -418,6 +419,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                       ? jsx(OverviewView, { detail: detail.data })
                       : jsx('pre', {
                           className: 'min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words p-4 font-mono text-xs leading-relaxed',
+                          'data-selectable-text': 'true',
                           children: detail.data[view] || ''
                         })
                     : jsx('div', {

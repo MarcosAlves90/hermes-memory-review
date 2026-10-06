@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.9
+# Hermes Memory Review 1.5.10
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.9 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.10 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -16,7 +16,8 @@ Use the top switch to alternate between **Pending writes** and **Stored memory**
 Pending writes support local search and refresh, and open on a
 formatted **Overview** that presents metadata and proposed changes as readable
 fields. **Proposal**, **Diff**, **Raw**, and **Verify** remain available for
-technical inspection. Each pending write can be approved or rejected in place;
+technical inspection. Text in all five inspection views is selectable, so standard
+copy shortcuts work directly from the review pane. Each pending write can be approved or rejected in place;
 **Approve all** and **Reject all** require an explicit confirmation click. It
 polls every five seconds so changes remain visible even when a live plugin socket
 is unavailable. Approval and rejection run through the plugin backend and do not
@@ -154,5 +155,5 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.5.9 passes the repository verification suite: complete tests, Cobertura
+Version 1.5.10 passes the repository verification suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.

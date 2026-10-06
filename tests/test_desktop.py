@@ -86,6 +86,20 @@ def test_desktop_decisions_use_session_independent_backend():
     assert "Cannot approve" in source
 
 
+def test_pending_detail_text_is_selectable_for_copying():
+    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
+
+    overview_start = source.index("function OverviewView")
+    overview_end = source.index("function PendingWritesPage", overview_start)
+    overview_source = source[overview_start:overview_end]
+    assert "'data-selectable-text': 'true'" in overview_source
+
+    detail_start = source.index("? view === 'overview'")
+    detail_end = source.index(": jsx('div', {", detail_start)
+    detail_source = source[detail_start:detail_end]
+    assert "'data-selectable-text': 'true'" in detail_source
+
+
 def test_backend_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
     stage(
         tmp_path,

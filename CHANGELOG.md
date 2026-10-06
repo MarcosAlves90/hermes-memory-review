@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.5.10 — 2026-10-06
+
+- Pending-write inspection text is now selectable in **Overview**, **Proposal**, **Diff**, **Raw**, and **Verify**, so standard drag-selection plus copy shortcuts work in Hermes Desktop.
+- Selection is enabled only on the inspection content, leaving tabs and action controls non-selectable.
+
 ## 1.5.9 — 2026-10-06
 
 - Fixed pending-memory **Approve**, **Reject**, **Approve all**, **Reject all**, and **Delete obsolete** actions requiring an open or focused Hermes chat session.
