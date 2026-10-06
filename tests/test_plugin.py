@@ -168,6 +168,8 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
     assert "validity requirement" in llm.calls[0]["instructions"].lower()
     assert "hard output budget" in llm.calls[0]["instructions"].lower()
     assert "previous proposal" in llm.calls[1]["instructions"].lower()
+    assert "compress this candidate in place" in llm.calls[1]["instructions"].lower()
+    assert llm.calls[1]["input"][0]["text"] == plugin._entry_delimiter().join(original)
     assert result["after_tokens"] < result["before_tokens"]
 
 
@@ -186,6 +188,7 @@ def test_compaction_preview_retries_when_proposal_breaks_advertised_character_bu
     assert result["attempts"] == 2
     assert len(llm.calls) == 2
     assert "above its" in llm.calls[1]["instructions"].lower()
+    assert llm.calls[1]["input"][0]["text"] == "X" * 270
     assert result["after_chars"] == 120
 
 

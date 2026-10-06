@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.7 — 2026-10-06
+
+- Fixed the retry pass re-reading the full original corpus after a too-large first proposal, which encouraged the model to reconstruct the same verbose memory again.
+- The second pass now rewrites the first-pass candidate directly under the stricter budget and is explicitly forbidden from reintroducing details already discarded by the first pass.
+- Added regression coverage proving that retry input is the previous proposal rather than the original source corpus.
+
 ## 1.5.6 — 2026-10-06
 
 - Fixed compaction accepting outputs that violated the stricter character budget stated in the prompt; each attempt now enforces its advertised hard budget in plugin code.

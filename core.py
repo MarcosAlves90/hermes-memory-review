@@ -74,6 +74,8 @@ def _memory_compaction_instructions(
     source_entry_count: int,
     max_entries: int,
     attempt: int,
+    input_chars: Optional[int] = None,
+    input_entry_count: Optional[int] = None,
     previous_chars: Optional[int] = None,
     previous_entry_count: Optional[int] = None,
 ) -> str:
@@ -83,8 +85,9 @@ def _memory_compaction_instructions(
     if previous_chars is not None and previous_chars > previous_hard_budget:
         retry_note = (
             f" The previous proposal was {previous_chars} characters, above its {previous_hard_budget}-character limit. "
-            "Retry from the original source, not from the previous proposal. Be substantially more selective: keep the "
-            "durable/actionable memory and remove explanatory or incidental context that is not needed for future behavior."
+            "The input below is that previous proposal. Compress this candidate in place; do not re-expand it from the original "
+            "source or reintroduce details that the first pass already discarded. Keep only the durable/actionable core and "
+            "rewrite it substantially more densely."
         )
     if previous_entry_count is not None and previous_entry_count > max_entries:
         retry_note += (
@@ -92,7 +95,9 @@ def _memory_compaction_instructions(
             f"This retry MUST consolidate the memory into at most {max_entries} entries; do not preserve one entry per source item."
         )
     return (
-        f"Compact a source corpus of {source_entry_count} stored-memory entries ({source_chars} characters). Return at most "
+        f"The original source corpus had {source_entry_count} stored-memory entries ({source_chars} characters). "
+        f"The input below currently has {input_entry_count or source_entry_count} entries "
+        f"({input_chars if input_chars is not None else source_chars} characters). Return at most "
         f"{max_entries} entries, and fewer whenever the durable memory can be represented coherently in fewer entries. Do not "
         "mirror, enumerate, or otherwise preserve the source entry count. Merge related facts into dense thematic statements. "
         f"Hard output budget: the combined compacted entries, including separator overhead, must be at most {hard_budget} "
@@ -118,6 +123,8 @@ def build_memory_compaction_preview(llm: Any, target: str, entries: Sequence[str
     schema = _memory_compaction_schema(max_entries)
     previous_chars: Optional[int] = None
     previous_entry_count: Optional[int] = None
+    attempt_entries = list(source_entries)
+    attempt_text = source_text
     after_chars = before_chars
     after_tokens = before_tokens
     after_entry_count = before_entry_count
@@ -130,13 +137,15 @@ def build_memory_compaction_preview(llm: Any, target: str, entries: Sequence[str
             before_entry_count,
             max_entries,
             attempt,
+            len(attempt_text),
+            len(attempt_entries),
             previous_chars,
             previous_entry_count,
         )
         try:
             result = llm.complete_structured(
                 instructions=instructions,
-                input=[{"type": "text", "text": source_text}],
+                input=[{"type": "text", "text": attempt_text}],
                 json_schema=schema,
                 json_mode=True,
                 schema_name="memory_compaction_preview",
@@ -194,6 +203,8 @@ def build_memory_compaction_preview(llm: Any, target: str, entries: Sequence[str
             }
         previous_chars = after_chars
         previous_entry_count = after_entry_count
+        attempt_entries = proposed
+        attempt_text = proposed_text
 
     if after_entry_count > max_entries:
         error = (
