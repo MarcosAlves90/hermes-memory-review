@@ -207,6 +207,56 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     assert "at most 2 entries" in instructions
 
 
+def test_compaction_preview_retries_when_model_ignores_entry_limit(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = [
+        f"Durable source fact {index} with a large amount of redundant explanatory wording that should be compressed."
+        for index in range(1, 9)
+    ]
+    llm = FakeSequenceLlm(
+        [
+            ["a", "b", "c", "d", "e", "f", "g", "h"],
+            ["Core facts 1-4.", "Core facts 5-8."],
+        ]
+    )
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["attempts"] == 2
+    assert result["after_entry_count"] == 2
+    assert result["proposed_entries"] == ["Core facts 1-4.", "Core facts 5-8."]
+    assert len(llm.calls) == 2
+    retry_prompt = llm.calls[1]["instructions"].lower()
+    assert "8 entries" in retry_prompt
+    assert "maximum of 2" in retry_prompt
+
+
+def test_compaction_preview_fails_closed_when_model_keeps_ignoring_entry_limit(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = [
+        f"Durable source fact {index} with redundant explanatory wording that should be compressed."
+        for index in range(1, 9)
+    ]
+    too_many = ["a", "b", "c", "d", "e", "f", "g", "h"]
+    llm = FakeSequenceLlm([too_many, too_many])
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is False
+    assert result["after_entry_count"] == 8
+    assert "maximum of 2 entries" in result["error"]
+    assert len(llm.calls) == 2
+
+
 def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):
     plugin = load_plugin()
     llm = FakeLlm(["unused"])
