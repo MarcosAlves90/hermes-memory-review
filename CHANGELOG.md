@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.6 — 2026-10-06
+
+- Fixed compaction accepting outputs that violated the stricter character budget stated in the prompt; each attempt now enforces its advertised hard budget in plugin code.
+- Moved the invariant compaction policy into Hermes' supported `system_prompt` channel so stored memory is lower-authority data and source entry boundaries cannot steer the output structure.
+- Explicitly directs the model to optimize for the fewest coherent thematic entries, including one output entry consolidating many source entries when appropriate.
+- Increased the minimum first-pass reduction from 25% to the prompt's actual 40% hard budget; the retry remains stricter at a 55% reduction target.
+
 ## 1.5.5 — 2026-10-06
 
 - Fixed AI compaction accepting proposals that exceeded the requested entry-count limit when Hermes/provider-side JSON Schema validation was unavailable or not enforced.

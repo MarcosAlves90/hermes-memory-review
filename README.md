@@ -40,9 +40,11 @@ extracts the durable, actionable core, merges related facts into a small number 
 thematic entries, and removes examples, explanations, narrative history, temporary
 status, repeated qualifiers, and low-value nuance that would not change a future
 answer or action. The structured output schema also caps the proposal entry count
-based on the source size. A proposal must reduce the exact stored-memory character
-footprint by at least 25%; Hermes automatically retries once with a stricter budget
-when needed. The plugin also validates the output entry count itself after the LLM
+based on the source size. The invariant compaction policy is sent through Hermes'
+supported `system_prompt` channel, while the stored memory remains lower-authority
+input data. A proposal must satisfy the exact hard character budget stated to the
+model: at most 60% of the source footprint on the first attempt, then 45% on the
+automatic retry. The plugin also validates the output entry count itself after the LLM
 returns: if a provider/model ignores the JSON Schema `maxItems`, the proposal is
 rejected and retried rather than shown with too many entries. A second violation
 fails closed without changing memory. While generation is running, Desktop shows an activity indicator and
@@ -143,5 +145,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.5 is validated with POLIS V6.10.0 strict gates,
+Version 1.5.6 is validated with POLIS V6.10.0 gates,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

@@ -141,8 +141,9 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     call = llm.calls[0]
     assert "provider" not in call
     assert "model" not in call
-    assert "untrusted data" in call["instructions"].lower()
-    assert "preserve" in call["instructions"].lower()
+    assert "untrusted data" in call["system_prompt"].lower()
+    assert "fewest coherent" in call["system_prompt"].lower()
+    assert "do not" in call["instructions"].lower()
 
 
 def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprint(monkeypatch, tmp_path):
@@ -151,7 +152,7 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
     llm = FakeSequenceLlm(
         [
             original,
-            ["Prefers concise answers with precise technical detail."],
+            ["Concise, precise answers."],
         ]
     )
     ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
@@ -164,10 +165,28 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
     assert result["success"] is True
     assert result["attempts"] == 2
     assert len(llm.calls) == 2
-    assert "materially smaller" in llm.calls[0]["instructions"].lower()
+    assert "validity requirement" in llm.calls[0]["instructions"].lower()
     assert "hard output budget" in llm.calls[0]["instructions"].lower()
     assert "previous proposal" in llm.calls[1]["instructions"].lower()
     assert result["after_tokens"] < result["before_tokens"]
+
+
+def test_compaction_preview_retries_when_proposal_breaks_advertised_character_budget(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = ["A" * 100, "B" * 100, "C" * 100, "D" * 100]
+    llm = FakeSequenceLlm([["X" * 270], ["Y" * 120]])
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["attempts"] == 2
+    assert len(llm.calls) == 2
+    assert "above its" in llm.calls[1]["instructions"].lower()
+    assert result["after_chars"] == 120
 
 
 def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, tmp_path):
@@ -197,13 +216,14 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     assert result["success"] is True
     assert result["before_entry_count"] == 8
     assert result["after_entry_count"] == 2
-    assert result["reduction_percent"] >= 25
+    assert result["reduction_percent"] >= 40
     call = llm.calls[0]
     assert call["json_schema"]["properties"]["entries"]["maxItems"] == 2
     instructions = call["instructions"].lower()
-    assert "do not preserve source entry boundaries" in instructions
-    assert "durable, actionable core" in instructions
-    assert "examples" in instructions
+    system_prompt = call["system_prompt"].lower()
+    assert "source entry boundaries have no semantic value" in system_prompt
+    assert "smallest durable representation" in system_prompt
+    assert "examples" in system_prompt
     assert "at most 2 entries" in instructions
 
 

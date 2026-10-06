@@ -420,7 +420,8 @@ def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch
     call = llm.calls[0]
     assert "provider" not in call
     assert "model" not in call
-    assert "untrusted data" in call["instructions"].lower()
+    assert "untrusted data" in call["system_prompt"].lower()
+    assert "fewest coherent" in call["system_prompt"].lower()
     assert "preserve" in call["instructions"].lower()
 
 

@@ -1,5 +1,5 @@
 name: memory-review
-version: 1.5.5
+version: 1.5.6
 manifest_version: 2
 api_version: 1
 description: "Review pending Hermes memory writes and inspect, add, edit, delete, or AI-compact stored MEMORY.md and USER.md entries from Desktop."
