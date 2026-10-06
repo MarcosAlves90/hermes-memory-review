@@ -2,6 +2,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -173,6 +174,21 @@ class FakeMemoryStore:
         return {"success": True, "message": "Applied compaction."}
 
 
+class FakeCompactionLlm:
+    def __init__(self, entries=None):
+        self.entries = list(entries or ["first fact; second fact"])
+        self.calls = []
+
+    def complete_structured(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(
+            parsed={"entries": self.entries},
+            text=json.dumps({"entries": self.entries}),
+            provider="default-provider",
+            model="default-model",
+        )
+
+
 def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
     api = load_api()
     store = FakeMemoryStore(memory=["agent note", "second note"], user=["user profile"])
@@ -274,7 +290,40 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "Compact with AI" in source
     assert "Apply compaction" in source
     assert "Cancel preview" in source
-    assert "memory-compact-preview" in source
+    preview_start = source.index("const requestCompaction")
+    preview_end = source.index("const applyCompaction", preview_start)
+    preview_source = source[preview_start:preview_end]
+    assert "/compact/preview" in preview_source
+    assert "ctx.rest" in preview_source
+    assert "slash.exec" not in preview_source
+    assert "activeSessionId" not in preview_source
+    assert "focusedSessionId" not in preview_source
+
+
+def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["first fact", "second fact with detail"], user=["profile"])
+    llm = FakeCompactionLlm(["first fact; second fact with detail"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    monkeypatch.setattr(api, "_plugin_llm", lambda: llm, raising=False)
+
+    response = client_for(api).post("/memory/memory/compact/preview")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["target"] == "memory"
+    assert body["provider"] == "default-provider"
+    assert body["model"] == "default-model"
+    assert body["proposed_entries"] == ["first fact; second fact with detail"]
+    assert body["source_fingerprint"] == api._source_fingerprint(store.memory_entries)
+    assert body["before_tokens"] > body["after_tokens"]
+    assert len(llm.calls) == 1
+    call = llm.calls[0]
+    assert "provider" not in call
+    assert "model" not in call
+    assert "untrusted data" in call["instructions"].lower()
+    assert "preserve" in call["instructions"].lower()
 
 
 def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):

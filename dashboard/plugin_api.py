@@ -8,9 +8,9 @@ Stored-memory edits delegate persistence to Hermes' own ``MemoryStore``.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import runpy
+import sys
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -23,11 +23,14 @@ _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 _core = runpy.run_path(str(_PLUGIN_ROOT / "core.py"))
 MemoryReview = _core["MemoryReview"]
 resolve_hermes_home = _core["resolve_hermes_home"]
+build_memory_compaction_preview = _core["build_memory_compaction_preview"]
+memory_source_fingerprint = _core["memory_source_fingerprint"]
 
 router = APIRouter()
 
 _MEMORY_CHARS_PER_TOKEN = 2.75
 _TOKEN_ESTIMATE_METHOD = "hermes_memory_budget_2.75_chars_per_token"
+_RUNTIME_BRIDGE_ALIAS = "_hermes_memory_review_runtime_bridge"
 
 
 class MemoryEditRequest(BaseModel):
@@ -98,8 +101,16 @@ def _estimate_tokens(text: str) -> int:
 
 
 def _source_fingerprint(entries: List[str]) -> str:
-    payload = json.dumps(list(entries), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(payload).hexdigest()
+    return memory_source_fingerprint(entries)
+
+
+def _plugin_llm() -> Any:
+    bridge = sys.modules.get(_RUNTIME_BRIDGE_ALIAS)
+    if bridge is None:
+        raise RuntimeError(
+            "Hermes Memory Review Agent context is unavailable; enable the Agent plugin for this profile."
+        )
+    return bridge.get_plugin_llm()
 
 
 def _memory_target(store: Any, target: str) -> Dict[str, Any]:
@@ -189,6 +200,20 @@ def replace_stored_memory(target: str, body: MemoryEditRequest) -> Dict[str, Any
         "result": result,
         "target": _memory_target(store, target),
     }
+
+
+@router.post("/memory/{target}/compact/preview")
+def preview_memory_compaction(target: str) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        return {"success": False, "error": "target must be 'memory' or 'user'."}
+
+    store = _memory_store()
+    entries = list(store.memory_entries if target == "memory" else store.user_entries)
+    try:
+        llm = _plugin_llm()
+    except Exception as exc:
+        return {"success": False, "error": f"AI compaction unavailable: {exc}"}
+    return build_memory_compaction_preview(llm, target, entries, _entry_delimiter())
 
 
 @router.post("/memory/{target}/compact")

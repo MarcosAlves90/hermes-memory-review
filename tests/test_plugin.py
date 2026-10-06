@@ -14,6 +14,8 @@ def load_plugin():
     name = "memory_review_plugin_test"
     sys.modules.pop(name, None)
     sys.modules.pop(name + ".core", None)
+    sys.modules.pop(name + ".runtime_bridge", None)
+    sys.modules.pop("_hermes_memory_review_runtime_bridge", None)
     spec = importlib.util.spec_from_file_location(
         name,
         PLUGIN_DIR / "__init__.py",
@@ -35,6 +37,7 @@ class FakeCtx:
         self.commands = {}
         self.cli_commands = {}
         self.llm = llm
+        self.unload_callbacks = []
 
     def get_config(self, key, default=None):
         if self.raise_config:
@@ -47,6 +50,9 @@ class FakeCtx:
     def register_cli_command(self, name, **kwargs):
         self.cli_commands[name] = kwargs
 
+    def on_unload(self, callback):
+        self.unload_callbacks.append(callback)
+
 
 def test_registers_supported_commands(tmp_path):
     plugin = load_plugin()
@@ -58,6 +64,16 @@ def test_registers_supported_commands(tmp_path):
     assert ctx.commands["memory-review"]["argument_mode"] == "text"
     assert "<id" in ctx.commands["memory-show"]["args_hint"]
     assert "memory|user" in ctx.commands["memory-compact-preview"]["args_hint"]
+    bridge = sys.modules["_hermes_memory_review_runtime_bridge"]
+    assert bridge.get_plugin_llm() is ctx.llm
+    assert len(ctx.unload_callbacks) == 1
+    ctx.unload_callbacks[0]()
+    try:
+        bridge.get_plugin_llm()
+    except RuntimeError as exc:
+        assert "Agent context is unavailable" in str(exc)
+    else:
+        raise AssertionError("unload must clear the bound plugin context")
 
 
 class FakeLlm:

@@ -805,24 +805,9 @@ export default {
         body: { old_text: oldText, content }
       })
     const requestCompaction = async target => {
-      const activeSessionId = host.state.activeSessionId.get()
-      const focusedSessionId = host.state.focusedSessionId.get()
-      const sessionId = focusedSessionId || activeSessionId
-      if (!sessionId) {
-        throw new Error('Open or focus a Hermes session before generating an AI compaction preview.')
-      }
-      const response = await host.request('slash.exec', {
-        session_id: sessionId,
-        command: `/memory-compact-preview ${target}`
+      const parsed = await ctx.rest(`/memory/${encodeURIComponent(target)}/compact/preview`, {
+        method: 'POST'
       })
-      const output = response?.output
-      if (!output) throw new Error('Hermes returned no compaction preview.')
-      let parsed
-      try {
-        parsed = JSON.parse(output)
-      } catch (_error) {
-        throw new Error(output)
-      }
       if (!parsed?.success) throw new Error(parsed?.error || 'AI compaction preview failed.')
       return parsed
     }

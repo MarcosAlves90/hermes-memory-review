@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.2 — 2026-10-06
+
+- Fixed **Compact with AI** so preview generation no longer requires an open, active, or focused Hermes chat session.
+- Moved Desktop preview requests to the plugin REST backend while preserving Hermes `ctx.llm` ownership of default-model routing, credentials, trust checks, and attribution.
+- Kept preview generation non-mutating and retained stale-fingerprint validation plus one atomic `MemoryStore.apply_batch()` transaction for explicit application.
+
 ## 1.5.1 — 2026-10-06
 
 - Fixed Stored memory token estimates to use Hermes' documented memory-budget scale of 2.75 chars/token instead of the generic model token estimator.

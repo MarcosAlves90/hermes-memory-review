@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.1
+# Hermes Memory Review 1.5.2
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.1 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.2 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -37,6 +37,8 @@ data and is instructed to preserve distinct facts, preferences, constraints,
 decisions, names, identifiers, relationships, dates, workflow details, and other
 important nuance while removing repetition and excess wording. The result is
 shown as a preview with the before/after token estimate and model attribution.
+Preview generation runs through the plugin backend and does not require an open,
+active, or focused chat session.
 Nothing is written until **Apply compaction** is selected. Applying verifies that
 the source entries have not changed since the preview and then performs one
 atomic `MemoryStore.apply_batch()` update.
@@ -102,7 +104,8 @@ files directly: they call the documented Hermes Desktop SDK gateway path and
 execute Hermes' native `/memory approve|reject <id|all>` commands.
 
 For stored memory, the plugin backend exposes profile-scoped `GET /memory`,
-`PUT /memory/{target}`, and `POST /memory/{target}/compact` routes. The GET route
+`PUT /memory/{target}`, `POST /memory/{target}/compact/preview`, and
+`POST /memory/{target}/compact` routes. The GET route
 reports Hermes' rough token estimate for each target. The PUT route loads Hermes'
 on-disk store with
 `tools.memory_tool.load_on_disk_store()` and calls `MemoryStore.replace()` with
@@ -111,8 +114,8 @@ rewrites `MEMORY.md` or `USER.md` directly, so a stale, invalid, over-budget, or
 blocked replacement is rejected by Hermes instead of silently overwriting newer
 state.
 
-AI preview generation runs through the plugin command context and
-`ctx.llm.complete_structured()` without a provider or model override, so Hermes
+AI preview generation reuses the Agent plugin's bound context from the backend and
+calls `ctx.llm.complete_structured()` without a provider or model override, so Hermes
 keeps provider selection, credentials, fallback, and the active/default model.
 The preview carries a fingerprint of the exact source entries. The compact POST
 route rejects a stale fingerprint and delegates the complete consolidation to a
@@ -128,5 +131,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.1 is validated under a strict POLIS V6.10.0 contract,
+Version 1.5.2 is validated under a strict POLIS V6.10.0 contract,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

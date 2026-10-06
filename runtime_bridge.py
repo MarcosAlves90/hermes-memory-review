@@ -1,0 +1,41 @@
+"""Runtime bridge between the Agent and dashboard halves of the plugin.
+
+Hermes imports ``__init__.py`` and ``dashboard/plugin_api.py`` as separate
+modules inside the same plugin-host process.  The Agent half receives the
+supported ``PluginContext``; dashboard routes do not.  This module keeps only
+the already-bound context so backend requests can reuse ``ctx.llm`` without
+constructing a provider client or depending on a chat session.
+"""
+
+from __future__ import annotations
+
+import sys
+from typing import Any
+
+
+RUNTIME_BRIDGE_ALIAS = "_hermes_memory_review_runtime_bridge"
+_plugin_context: Any = None
+
+# dashboard/plugin_api.py is imported under a different synthetic package name.
+# A stable process-local alias lets it find this exact module without depending
+# on Hermes' private synthetic module naming scheme.
+sys.modules[RUNTIME_BRIDGE_ALIAS] = sys.modules[__name__]
+
+
+def bind_plugin_context(ctx: Any) -> None:
+    global _plugin_context
+    _plugin_context = ctx
+
+
+def clear_plugin_context(ctx: Any = None) -> None:
+    global _plugin_context
+    if ctx is None or _plugin_context is ctx:
+        _plugin_context = None
+
+
+def get_plugin_llm() -> Any:
+    if _plugin_context is None:
+        raise RuntimeError(
+            "Hermes Memory Review Agent context is unavailable; enable the Agent plugin for this profile."
+        )
+    return _plugin_context.llm
