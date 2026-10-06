@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.8 — 2026-10-06
+
+- Pending replace/remove proposals now compare their pinned `matched_entry` targets with the current stored Memory/User entries and are marked obsolete when those targets no longer exist.
+- Desktop highlights obsolete proposals in the pending list and detail view, disables approval that Hermes would reject as stale, and relabels Reject as **Delete obsolete** so the dead proposal can be removed through Hermes' native decision path.
+- Batch proposals are marked obsolete when any pinned destructive operation targets a missing entry; legacy destructive proposals without a pin are shown as unverifiable and cannot be approved.
+
 ## 1.5.7 — 2026-10-06
 
 - Fixed the retry pass re-reading the full original corpus after a too-large first proposal, which encouraged the model to reconstruct the same verbose memory again.

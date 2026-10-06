@@ -119,6 +119,8 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
   })
 
   const records = listing.data?.records || []
+  const missingTargetCount = records.filter(record => record.target_status?.state === 'missing').length
+  const blockedApprovalCount = records.filter(record => record.target_status?.can_apply === false).length
   const query = search.trim().toLocaleLowerCase()
   const filtered = useMemo(
     () =>
@@ -206,7 +208,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
           }),
           jsx('span', {
             className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
-            children: `${listing.data?.count ?? 0} pending`
+            children: `${listing.data?.count ?? 0} pending${missingTargetCount ? ` · ${missingTargetCount} obsolete` : ''}`
           }),
           jsx('button', {
             type: 'button',
@@ -227,7 +229,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                 }),
                 jsx('button', {
                   type: 'button',
-                  disabled: Boolean(busyAction),
+                  disabled: Boolean(busyAction) || (bulkConfirm === 'approve' && blockedApprovalCount > 0),
                   onClick: () => decide(bulkConfirm, 'all'),
                   className: `rounded border border-(--ui-stroke-secondary) px-2.5 py-1 ${
                     bulkConfirm === 'reject' ? 'text-(--ui-danger,#f87171)' : ''
@@ -249,7 +251,8 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                 jsx('span', { className: 'mr-auto text-xs text-(--ui-text-tertiary)', children: 'Bulk actions' }),
                 jsx('button', {
                   type: 'button',
-                  disabled: Boolean(busyAction),
+                  disabled: Boolean(busyAction) || blockedApprovalCount > 0,
+                  title: blockedApprovalCount ? 'Resolve obsolete or unverifiable proposals before approving all.' : undefined,
                   onClick: () => setBulkConfirm('approve'),
                   className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
                   children: 'Approve all'
@@ -319,6 +322,12 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                                   className: 'mt-1 text-[0.6875rem] text-(--ui-text-quaternary)',
                                   children: 'automatic review'
                                 })
+                              : null,
+                            record.target_status?.state === 'missing'
+                              ? jsx('div', {
+                                  className: 'mt-1 text-[0.6875rem] text-(--ui-danger,#f87171)',
+                                  children: 'target missing · obsolete proposal'
+                                })
                               : null
                           ]
                         }, record.id)
@@ -349,17 +358,29 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                       jsx('span', { className: 'min-w-2 flex-1' }),
                       jsx('button', {
                         type: 'button',
-                        disabled: Boolean(busyAction),
+                        disabled:
+                          Boolean(busyAction) ||
+                          detail.isLoading ||
+                          !detail.data ||
+                          detail.data.record?.target_status?.can_apply === false,
                         onClick: () => decide('approve', currentId),
                         className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
-                        children: busyAction === `approve:${currentId}` ? 'Approving…' : 'Approve'
+                        children:
+                          detail.data?.record?.target_status?.can_apply === false
+                            ? 'Cannot approve'
+                            : busyAction === `approve:${currentId}`
+                              ? 'Approving…'
+                              : 'Approve'
                       }, 'approve'),
                       jsx('button', {
                         type: 'button',
                         disabled: Boolean(busyAction),
                         onClick: () => decide('reject', currentId),
                         className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs text-(--ui-danger,#f87171) hover:bg-(--chrome-action-hover) disabled:opacity-50',
-                        children: busyAction === `reject:${currentId}` ? 'Rejecting…' : 'Reject'
+                        children:
+                          busyAction === `reject:${currentId}`
+                            ? detail.data?.record?.target_status?.state === 'missing' ? 'Deleting…' : 'Rejecting…'
+                            : detail.data?.record?.target_status?.state === 'missing' ? 'Delete obsolete' : 'Reject'
                       }, 'reject')
                     ]
                   })
@@ -372,6 +393,19 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                     children: feedback.message
                   })
                 : null,
+              detail.data?.record?.target_status?.state === 'missing'
+                ? jsx('div', {
+                    className: 'border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs text-(--ui-danger,#f87171)',
+                    children:
+                      detail.data.record.target_status.message ||
+                      'Target entry no longer exists. Reject this obsolete proposal to delete it.'
+                  })
+                : detail.data?.record?.target_status?.state === 'unverifiable'
+                  ? jsx('div', {
+                      className: 'border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs text-(--ui-danger,#f87171)',
+                      children: detail.data.record.target_status.message
+                    })
+                  : null,
               detail.isError
                 ? jsx('div', {
                     className: 'p-4 text-sm text-(--ui-text-tertiary)',

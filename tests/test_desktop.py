@@ -75,6 +75,9 @@ def test_desktop_decisions_use_native_hermes_memory_commands():
     assert "useState('overview')" in source
     assert "Approve all" in source and "Reject all" in source
     assert "Confirm ${bulkConfirm} all" in source
+    assert "target missing · obsolete proposal" in source
+    assert "Delete obsolete" in source
+    assert "Cannot approve" in source
 
 
 def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
@@ -87,6 +90,7 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
     )
     monkeypatch.setenv("HERMES_HOME", str(tmp_path))
     api = load_api()
+    monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore(memory=["old"]))
     client = client_for(api)
 
     listing = client.get("/records")
@@ -101,6 +105,12 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
         "origin": "background_review",
         "summary": "replace preference",
         "created_at": 1.0,
+        "target_status": {
+            "state": "ready",
+            "can_apply": True,
+            "missing_count": 0,
+            "destructive_count": 1,
+        },
     }
 
     detail = client.get("/records/abc123")
@@ -195,6 +205,54 @@ class FakeMemoryStore:
         else:
             self.user_entries = working
         return {"success": True, "message": "Applied compaction."}
+
+
+def test_backend_marks_pending_write_obsolete_when_pinned_target_is_missing(monkeypatch, tmp_path):
+    stage(
+        tmp_path,
+        "stale123",
+        {"action": "remove", "target": "memory", "old_text": "gone", "matched_entry": "gone"},
+        summary="remove stale memory",
+    )
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_api()
+    monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore(memory=["still here"]))
+    client = client_for(api)
+
+    listing_status = client.get("/records").json()["records"][0]["target_status"]
+    detail_status = client.get("/records/stale123").json()["record"]["target_status"]
+
+    assert listing_status == detail_status
+    assert detail_status["state"] == "missing"
+    assert detail_status["can_apply"] is False
+    assert detail_status["missing_count"] == 1
+    assert "reject it to delete the proposal" in detail_status["message"].lower()
+
+
+def test_backend_marks_batch_obsolete_when_any_pinned_target_is_missing(monkeypatch, tmp_path):
+    stage(
+        tmp_path,
+        "batch-stale",
+        {
+            "action": "batch",
+            "target": "user",
+            "operations": [
+                {"action": "replace", "old_text": "present", "matched_entry": "present", "content": "new"},
+                {"action": "remove", "old_text": "gone", "matched_entry": "gone"},
+                {"action": "add", "content": "added"},
+            ],
+        },
+    )
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_api()
+    monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore(user=["present"]))
+
+    status = client_for(api).get("/records/batch-stale").json()["record"]["target_status"]
+
+    assert status["state"] == "missing"
+    assert status["can_apply"] is False
+    assert status["missing_count"] == 1
+    assert status["destructive_count"] == 2
 
 
 class FakeCompactionLlm:

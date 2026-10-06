@@ -140,8 +140,62 @@ def _memory_target(store: Any, target: str) -> Dict[str, Any]:
     }
 
 
-def _record_summary(record: Any) -> Dict[str, Any]:
+def _record_target_status(record: Any, store: Any) -> Dict[str, Any]:
+    """Report whether pinned replace/remove targets still exist in live memory."""
+    payload = record.payload
+    target = payload.get("target")
+    if target not in {"memory", "user"}:
+        return {"state": "unknown", "can_apply": True, "missing_count": 0, "destructive_count": 0}
+
+    entries = store.memory_entries if target == "memory" else store.user_entries
+    operations = payload.get("operations") if payload.get("action") == "batch" else [payload]
+    operations = operations if isinstance(operations, list) else []
+    destructive = [
+        operation
+        for operation in operations
+        if isinstance(operation, dict) and operation.get("action") in {"replace", "remove"}
+    ]
+    missing = [
+        operation
+        for operation in destructive
+        if operation.get("matched_entry") and operation.get("matched_entry") not in entries
+    ]
+    unpinned = [operation for operation in destructive if not operation.get("matched_entry")]
+
+    if missing:
+        count = len(missing)
+        noun = "entry" if count == 1 else "entries"
+        return {
+            "state": "missing",
+            "can_apply": False,
+            "missing_count": count,
+            "destructive_count": len(destructive),
+            "message": (
+                f"{count} pinned target {noun} no longer exists in stored {target} memory. "
+                "This pending write is obsolete; reject it to delete the proposal."
+            ),
+        }
+    if unpinned:
+        return {
+            "state": "unverifiable",
+            "can_apply": False,
+            "missing_count": 0,
+            "destructive_count": len(destructive),
+            "message": (
+                "This destructive pending write has no pinned target and cannot be verified safely; "
+                "reject it and recreate the change."
+            ),
+        }
     return {
+        "state": "ready" if destructive else "not_applicable",
+        "can_apply": True,
+        "missing_count": 0,
+        "destructive_count": len(destructive),
+    }
+
+
+def _record_summary(record: Any, target_status: Dict[str, Any] | None = None) -> Dict[str, Any]:
+    summary = {
         "id": record.id,
         "action": record.action,
         "target": record.target,
@@ -149,15 +203,35 @@ def _record_summary(record: Any) -> Dict[str, Any]:
         "summary": record.summary,
         "created_at": record.created_at,
     }
+    if target_status is not None:
+        summary["target_status"] = target_status
+    return summary
+
+
+def _target_status_for_records(records: List[Any]) -> Dict[str, Dict[str, Any]]:
+    try:
+        store = _memory_store()
+    except Exception:
+        return {
+            record.id: {
+                "state": "unknown",
+                "can_apply": True,
+                "missing_count": 0,
+                "destructive_count": 0,
+            }
+            for record in records
+        }
+    return {record.id: _record_target_status(record, store) for record in records}
 
 
 @router.get("/records")
 def list_records() -> Dict[str, Any]:
     review = _review()
     records, issues = review._load()
+    statuses = _target_status_for_records(records)
     return {
         "count": len(records),
-        "records": [_record_summary(record) for record in reversed(records)],
+        "records": [_record_summary(record, statuses[record.id]) for record in reversed(records)],
         "issues": issues,
     }
 
@@ -171,9 +245,10 @@ def record_detail(selector: str) -> Dict[str, Any]:
             error = f"No pending memory write with id/prefix {selector!r}."
         raise HTTPException(status_code=404, detail=error)
     assert record is not None
+    target_status = _target_status_for_records([record])[record.id]
     return {
         "id": record.id,
-        "record": _record_summary(record),
+        "record": _record_summary(record, target_status),
         "payload": record.payload,
         "proposal": review.show(record.id),
         "diff": review.diff(record.id),

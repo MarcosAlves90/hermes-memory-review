@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.5
+# Hermes Memory Review 1.5.8
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.5 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.8 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -19,7 +19,10 @@ fields. **Proposal**, **Diff**, **Raw**, and **Verify** remain available for
 technical inspection. Each pending write can be approved or rejected in place;
 **Approve all** and **Reject all** require an explicit confirmation click. It
 polls every five seconds so changes remain visible even when a live plugin socket
-is unavailable.
+is unavailable. Pending replace/remove proposals are also checked against the
+current stored entries. If a pinned target has already been deleted, the proposal
+is marked obsolete, approval is disabled, and **Delete obsolete** rejects/removes
+the stale proposal through Hermes' native memory decision path.
 
 **Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User**
 (`USER.md`) views. Every stored entry is listed and searchable. Select an entry,
@@ -147,5 +150,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.7 is validated with POLIS V6.10.0 gates,
+Version 1.5.8 is validated with POLIS V6.10.0 gates,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.
