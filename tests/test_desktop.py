@@ -67,10 +67,16 @@ def test_unified_desktop_package_uses_documented_surfaces():
     assert "document." not in source
 
 
-def test_desktop_decisions_use_native_hermes_memory_commands():
+def test_desktop_decisions_use_session_independent_backend():
     source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
-    assert "host.request('slash.exec'" in source, "desktop decision actions must use Hermes slash.exec"
-    assert "command: `/memory ${action} ${target}`" in source
+    decision_start = source.index("const runDecision")
+    decision_end = source.index("ctx.registerMany", decision_start)
+    decision_source = source[decision_start:decision_end]
+    assert "ctx.rest" in decision_source
+    assert "/decision" in decision_source
+    assert "slash.exec" not in decision_source
+    assert "activeSessionId" not in decision_source
+    assert "focusedSessionId" not in decision_source
     assert "['overview', 'Overview']" in source
     assert "useState('overview')" in source
     assert "Approve all" in source and "Reject all" in source
@@ -78,6 +84,78 @@ def test_desktop_decisions_use_native_hermes_memory_commands():
     assert "target missing · obsolete proposal" in source
     assert "Delete obsolete" in source
     assert "Cannot approve" in source
+
+
+def test_backend_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
+    stage(
+        tmp_path,
+        "approve123",
+        {"action": "replace", "target": "memory", "old_text": "old", "matched_entry": "old", "content": "new"},
+    )
+    stage(
+        tmp_path,
+        "reject123",
+        {"action": "add", "target": "memory", "content": "discard me"},
+        created=2,
+    )
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_api()
+    store = FakeMemoryStore(memory=["old"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    monkeypatch.setattr(
+        api,
+        "_apply_pending_memory",
+        lambda payload, active_store: active_store.replace(
+            payload["target"],
+            payload["old_text"],
+            payload["content"],
+            matched_entry=payload["matched_entry"],
+        ),
+    )
+    client = client_for(api)
+
+    approved = client.post("/records/approve123/decision", json={"action": "approve"})
+    rejected = client.post("/records/reject123/decision", json={"action": "reject"})
+
+    assert approved.status_code == 200
+    assert approved.json()["success"] is True
+    assert "Approved 1 memory write(s)." in approved.json()["output"]
+    assert store.memory_entries == ["new"]
+    assert not (tmp_path / "pending" / "memory" / "approve123.json").exists()
+
+    assert rejected.status_code == 200
+    assert rejected.json()["success"] is True
+    assert "Rejected pending memory write 'reject123'." in rejected.json()["output"]
+    assert not (tmp_path / "pending" / "memory" / "reject123.json").exists()
+
+
+def test_backend_bulk_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
+    stage(tmp_path, "add-one", {"action": "add", "target": "memory", "content": "one"})
+    stage(tmp_path, "add-two", {"action": "add", "target": "memory", "content": "two"}, created=2)
+    monkeypatch.setenv("HERMES_HOME", str(tmp_path))
+    api = load_api()
+    store = FakeMemoryStore()
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    monkeypatch.setattr(
+        api,
+        "_apply_pending_memory",
+        lambda payload, active_store: active_store.add(payload["target"], payload["content"]),
+    )
+    client = client_for(api)
+
+    approved = client.post("/records/all/decision", json={"action": "approve"})
+
+    assert approved.status_code == 200
+    assert "Approved 2 memory write(s)." in approved.json()["output"]
+    assert store.memory_entries == ["one", "two"]
+
+    stage(tmp_path, "drop-one", {"action": "add", "target": "memory", "content": "three"}, created=3)
+    stage(tmp_path, "drop-two", {"action": "add", "target": "memory", "content": "four"}, created=4)
+    rejected = client.post("/records/all/decision", json={"action": "reject"})
+
+    assert rejected.status_code == 200
+    assert "Rejected 2 pending memory write(s)." in rejected.json()["output"]
+    assert not list((tmp_path / "pending" / "memory").glob("*.json"))
 
 
 def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):

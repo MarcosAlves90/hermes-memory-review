@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.9 — 2026-10-06
+
+- Fixed pending-memory **Approve**, **Reject**, **Approve all**, **Reject all**, and **Delete obsolete** actions requiring an open or focused Hermes chat session.
+- Desktop decisions now call the profile-scoped plugin backend instead of `slash.exec`; approved writes still replay through Hermes' native `apply_memory_pending()` pinned-entry semantics, while rejected proposals are removed from the pending queue.
+- Added regression coverage proving pending decisions work without `activeSessionId` or `focusedSessionId`.
+
 ## 1.5.8 — 2026-10-06
 
 - Pending replace/remove proposals now compare their pinned `matched_entry` targets with the current stored Memory/User entries and are marked obsolete when those targets no longer exist.

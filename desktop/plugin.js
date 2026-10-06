@@ -1,4 +1,4 @@
-import { ROUTES_AREA, SIDEBAR_NAV_AREA, host, useQuery } from '@hermes/plugin-sdk'
+import { ROUTES_AREA, SIDEBAR_NAV_AREA, useQuery } from '@hermes/plugin-sdk'
 import { useEffect, useMemo, useState } from 'react'
 import { jsx, jsxs } from 'react/jsx-runtime'
 
@@ -1039,16 +1039,12 @@ export default {
         body: { source_fingerprint: sourceFingerprint, entries }
       })
     const runDecision = async (action, target) => {
-      const activeSessionId = host.state.activeSessionId.get()
-      const focusedSessionId = host.state.focusedSessionId.get()
-      const sessionId = focusedSessionId || activeSessionId
-      if (!sessionId) {
-        throw new Error('Open or focus a Hermes session before approving or rejecting memory.')
-      }
-      return host.request('slash.exec', {
-        session_id: sessionId,
-        command: `/memory ${action} ${target}`
+      const parsed = await ctx.rest(`/records/${encodeURIComponent(target)}/decision`, {
+        method: 'POST',
+        body: { action }
       })
+      if (!parsed?.success) throw new Error(parsed?.error || `${action} failed.`)
+      return parsed
     }
 
     ctx.registerMany([

@@ -1,9 +1,10 @@
 """Structured backend for Hermes Memory Review.
 
 Hermes mounts this router below ``/api/plugins/memory-review`` and scopes the
-request to the active profile. Pending-write decisions are delegated to Hermes'
-native ``/memory`` command path through the documented Desktop Plugin SDK.
-Stored-memory edits delegate persistence to Hermes' own ``MemoryStore``.
+request to the active profile. Pending-write decisions replay Hermes' native
+staged-memory semantics directly in the plugin backend, so they are independent
+of chat sessions. Stored-memory edits delegate persistence to Hermes' own
+``MemoryStore``.
 """
 
 from __future__ import annotations
@@ -51,6 +52,10 @@ class MemoryCompactionApplyRequest(BaseModel):
     entries: List[str]
 
 
+class PendingDecisionRequest(BaseModel):
+    action: str
+
+
 def _settings() -> Dict[str, Any]:
     """Mirror PluginContext.get_config for this profile-scoped backend."""
     try:
@@ -89,6 +94,20 @@ def _memory_store() -> Any:
     from tools.memory_tool import load_on_disk_store
 
     return load_on_disk_store()
+
+
+def _apply_pending_memory(payload: Dict[str, Any], store: Any) -> Dict[str, Any]:
+    """Replay one approved staged write through Hermes' native pinned-entry semantics."""
+    from tools.memory_tool import apply_memory_pending
+
+    return apply_memory_pending(payload, store)
+
+
+def _changed_entries(result: Dict[str, Any], kind: str) -> List[str]:
+    """Mirror Hermes' approval output for whole entries replaced or removed."""
+    single = result.get(f"{kind}_entry")
+    batch = result.get(f"{kind}_entries") or {}
+    return ([single] if single else []) + [batch[key] for key in sorted(batch, key=int)]
 
 
 def _entry_delimiter() -> str:
@@ -255,6 +274,75 @@ def record_detail(selector: str) -> Dict[str, Any]:
         "raw": review.raw(record.id),
         "verify": review.verify(record.id),
     }
+
+
+@router.post("/records/{selector}/decision")
+def decide_pending_record(selector: str, body: PendingDecisionRequest) -> Dict[str, Any]:
+    action = body.action.strip().lower()
+    if action not in {"approve", "reject"}:
+        raise HTTPException(status_code=400, detail="action must be 'approve' or 'reject'.")
+
+    review = _review()
+    if selector == "all":
+        records, _issues = review._load()
+        if not records:
+            return {"success": True, "output": "No pending memory writes."}
+    else:
+        record, error = review._resolve(selector)
+        if error:
+            raise HTTPException(status_code=404, detail=error)
+        assert record is not None
+        records = [record]
+
+    if action == "reject":
+        removed = 0
+        failed = []
+        for record in records:
+            try:
+                record.path.unlink()
+                removed += 1
+            except Exception as exc:
+                failed.append(f"{record.id}: {exc}")
+
+        if selector == "all":
+            output = f"Rejected {removed} pending memory write(s)."
+        elif removed == 1:
+            output = f"Rejected pending memory write '{records[0].id}'."
+        else:
+            output = "Rejected 0 pending memory write(s)."
+        if failed:
+            output += "\nFailed:\n" + "\n".join(f"  {item}" for item in failed)
+        return {"success": True, "output": output}
+
+    store = _memory_store()
+    applied = 0
+    failed = []
+    overwritten = []
+    removed = []
+    for record in records:
+        try:
+            result = _apply_pending_memory(record.payload, store)
+        except Exception as exc:
+            result = {"success": False, "error": str(exc)}
+        if result.get("success"):
+            applied += 1
+            overwritten.extend(f"  {record.id}: {text}" for text in _changed_entries(result, "replaced"))
+            removed.extend(f"  {record.id}: {text}" for text in _changed_entries(result, "removed"))
+            try:
+                record.path.unlink()
+            except Exception as exc:
+                failed.append(f"{record.id}: applied but could not remove pending record: {exc}")
+        else:
+            failed.append(f"{record.id}: {result.get('error') or 'approval failed'}")
+
+    output = f"Approved {applied} memory write(s)."
+    if overwritten:
+        output += "\nOverwrote entire entry (re-add anything you still need):\n" + "\n".join(overwritten)
+    if removed:
+        output += "\nRemoved entry (re-add anything you still need):\n" + "\n".join(removed)
+    if failed:
+        output += "\nFailed:\n" + "\n".join(f"  {item}" for item in failed)
+    return {"success": True, "output": output}
 
 
 @router.get("/memory")

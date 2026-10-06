@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.8
+# Hermes Memory Review 1.5.9
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.8 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.9 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -19,8 +19,10 @@ fields. **Proposal**, **Diff**, **Raw**, and **Verify** remain available for
 technical inspection. Each pending write can be approved or rejected in place;
 **Approve all** and **Reject all** require an explicit confirmation click. It
 polls every five seconds so changes remain visible even when a live plugin socket
-is unavailable. Pending replace/remove proposals are also checked against the
-current stored entries. If a pinned target has already been deleted, the proposal
+is unavailable. Approval and rejection run through the plugin backend and do not
+require an open, active, or focused Hermes chat session. Pending replace/remove
+proposals are also checked against the current stored entries. If a pinned target
+has already been deleted, the proposal
 is marked obsolete, approval is disabled, and **Delete obsolete** rejects/removes
 the stale proposal through Hermes' native memory decision path.
 
@@ -119,8 +121,10 @@ admission check used by the Hermes catalog. Test dependencies are isolated by
 
 For pending proposals, the backend reads JSON records under the active profile's
 `pending/memory` directory. Desktop approve/reject buttons do not edit those
-files directly: they call the documented Hermes Desktop SDK gateway path and
-execute Hermes' native `/memory approve|reject <id|all>` commands.
+files directly. They call the plugin's profile-scoped REST backend, which replays
+approved writes through `tools.memory_tool.apply_memory_pending()` and removes
+rejected or successfully applied pending records. This preserves Hermes' pinned-entry
+approval semantics without routing through a session-bound slash command.
 
 For stored memory, the plugin backend exposes profile-scoped `GET /memory`,
 `PUT /memory/{target}`, `POST /memory/{target}/compact/preview`, and
@@ -148,7 +152,7 @@ The equivalent native commands are:
 /memory reject <id>
 ```
 
-## POLIS
+## Validation
 
-Version 1.5.8 is validated with POLIS V6.10.0 gates,
-complete tests, Cobertura coverage above 95%, and Hermes plugin validation.
+Version 1.5.9 passes the repository verification suite: complete tests, Cobertura
+coverage above 95%, and Hermes plugin validation.
