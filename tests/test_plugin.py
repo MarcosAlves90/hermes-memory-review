@@ -117,7 +117,13 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     plugin = load_plugin()
     llm = FakeLlm(["fact one; fact two detail"])
     ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
-    store = FakePreviewStore(memory=["fact one", "fact two with detail"], user=["profile fact"])
+    store = FakePreviewStore(
+        memory=[
+            "The first durable fact is fact one and this sentence contains unnecessary explanation.",
+            "The second durable fact is fact two with detail and this sentence repeats unnecessary context.",
+        ],
+        user=["profile fact"],
+    )
     monkeypatch.setattr(plugin, "_memory_store", lambda: store)
     plugin.register(ctx)
 
@@ -158,10 +164,47 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
     assert result["success"] is True
     assert result["attempts"] == 2
     assert len(llm.calls) == 2
-    assert "strictly smaller" in llm.calls[0]["instructions"].lower()
+    assert "materially smaller" in llm.calls[0]["instructions"].lower()
     assert "hard output budget" in llm.calls[0]["instructions"].lower()
     assert "previous proposal" in llm.calls[1]["instructions"].lower()
     assert result["after_tokens"] < result["before_tokens"]
+
+
+def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = [
+        "User prefers concise answers and dislikes filler explanations.",
+        "User prefers direct answers with minimal repetition.",
+        "User is building Hermes Memory Review.",
+        "Hermes Memory Review is a plugin for reviewing stored memory.",
+        "The plugin should keep memory actions explicit and reviewable.",
+        "The plugin must not mutate stored memory before explicit apply.",
+        "User values technical precision in implementation discussions.",
+        "User wants implementation details to remain technically precise.",
+    ]
+    compact = [
+        "User prefers concise, direct, technically precise answers without filler or repetition.",
+        "Hermes Memory Review: keep memory changes explicit/reviewable; never mutate stored memory before Apply.",
+    ]
+    llm = FakeLlm(compact)
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["before_entry_count"] == 8
+    assert result["after_entry_count"] == 2
+    assert result["reduction_percent"] >= 25
+    call = llm.calls[0]
+    assert call["json_schema"]["properties"]["entries"]["maxItems"] == 2
+    instructions = call["instructions"].lower()
+    assert "do not preserve source entry boundaries" in instructions
+    assert "durable, actionable core" in instructions
+    assert "examples" in instructions
+    assert "at most 2 entries" in instructions
 
 
 def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):

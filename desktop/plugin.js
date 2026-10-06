@@ -539,10 +539,10 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
   }
 
   return jsxs('div', {
-    className: 'flex h-full min-h-0 flex-col',
+    className: 'flex h-full min-h-0 flex-col overflow-hidden',
     children: [
       jsxs('header', {
-        className: 'flex flex-wrap items-center gap-3 border-b border-(--ui-stroke-secondary) px-4 py-3',
+        className: 'flex shrink-0 flex-wrap items-center gap-3 border-b border-(--ui-stroke-secondary) px-4 py-3',
         children: [
           jsxs('div', {
             className: 'min-w-0 flex-1',
@@ -582,7 +582,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
         ]
       }),
       jsx('div', {
-        className: 'flex flex-wrap gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
+        className: 'flex shrink-0 flex-wrap gap-1 border-b border-(--ui-stroke-secondary) px-3 py-2',
         children: STORED_TARGETS.map(([id, label]) =>
           jsx('button', {
             type: 'button',
@@ -600,7 +600,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
       }),
       feedback
         ? jsx('div', {
-            className: `border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs ${
+            className: `shrink-0 border-b border-(--ui-stroke-secondary) px-4 py-2 text-xs ${
               feedback.kind === 'error' ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'
             }`,
             children: feedback.message
@@ -608,7 +608,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
         : null,
       compacting
         ? jsxs('section', {
-            className: 'border-b border-(--ui-stroke-secondary) px-4 py-3',
+            className: 'shrink-0 border-b border-(--ui-stroke-secondary) px-4 py-3',
             children: [
               jsxs('div', {
                 className: 'flex items-center gap-2 text-sm font-medium',
@@ -636,15 +636,19 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
         : null,
       compactionPreview
         ? jsxs('section', {
-            className: 'border-b border-(--ui-stroke-secondary) bg-(--chrome-action-hover) px-4 py-3',
+            className: 'flex max-h-[40vh] shrink-0 flex-col overflow-hidden border-b border-(--ui-stroke-secondary) bg-(--chrome-action-hover)',
             children: [
               jsxs('div', {
-                className: 'flex flex-wrap items-center gap-2',
+                className: 'flex shrink-0 flex-wrap items-center gap-2 px-4 pt-3',
                 children: [
                   jsx('h2', { className: 'mr-auto text-sm font-semibold', children: 'AI compaction preview' }),
                   jsx('span', {
                     className: 'text-xs text-(--ui-text-tertiary)',
                     children: `~${compactionPreview.before_tokens} → ~${compactionPreview.after_tokens} tokens estimated`
+                  }),
+                  jsx('span', {
+                    className: 'text-xs text-(--ui-text-tertiary)',
+                    children: `${compactionPreview.before_entry_count ?? '?'} → ${compactionPreview.after_entry_count ?? '?'} entries · ${compactionPreview.reduction_percent ?? '?'}% smaller`
                   }),
                   jsx('span', {
                     className: 'text-xs text-(--ui-text-tertiary)',
@@ -657,7 +661,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                 ]
               }),
               jsx('div', {
-                className: 'mt-2 max-h-52 space-y-2 overflow-auto',
+                className: 'min-h-0 flex-1 space-y-2 overflow-auto px-4 py-3',
                 children: (compactionPreview.proposed_entries || []).map((entry, index) =>
                   jsxs('div', {
                     className: 'rounded border border-(--ui-stroke-secondary) bg-(--ui-bg-primary,transparent) p-2.5',
@@ -672,7 +676,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                 )
               }),
               jsxs('div', {
-                className: 'mt-3 flex flex-wrap items-center gap-2',
+                className: 'flex shrink-0 flex-wrap items-center gap-2 border-t border-(--ui-stroke-secondary) px-4 py-3',
                 children: [
                   jsx('button', {
                     type: 'button',
@@ -698,7 +702,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
           })
         : null,
       jsxs('div', {
-        className: 'grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(15rem,22rem)_1fr]',
+        className: 'grid min-h-0 flex-1 grid-cols-1 overflow-hidden md:grid-cols-[minmax(15rem,22rem)_1fr]',
         children: [
           jsxs('aside', {
             className: 'flex min-h-0 flex-col border-b border-(--ui-stroke-secondary) md:border-b-0 md:border-r',

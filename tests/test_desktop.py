@@ -292,6 +292,14 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "compactionElapsed" in source
     assert "setInterval" in source
     assert "automatically retry" in source
+    stored_start = source.index("function StoredMemoryPage")
+    stored_end = source.index("function MemoryReviewPage", stored_start)
+    stored_source = source[stored_start:stored_end]
+    assert "max-h-[40vh]" in stored_source
+    assert "shrink-0" in stored_source
+    assert "overflow-hidden" in stored_source
+    assert "before_entry_count" in stored_source
+    assert "reduction_percent" in stored_source
     assert "Apply compaction" in source
     assert "Cancel preview" in source
     preview_start = source.index("const requestCompaction")
@@ -306,7 +314,13 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
 
 def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch):
     api = load_api()
-    store = FakeMemoryStore(memory=["first fact", "second fact with detail"], user=["profile"])
+    store = FakeMemoryStore(
+        memory=[
+            "The first durable fact is first fact with unnecessary explanatory wording.",
+            "The second durable fact is second fact with detail and repeated explanatory wording.",
+        ],
+        user=["profile"],
+    )
     llm = FakeCompactionLlm(["first fact; second fact with detail"])
     monkeypatch.setattr(api, "_memory_store", lambda: store)
     monkeypatch.setattr(api, "_plugin_llm", lambda: llm, raising=False)

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.4 — 2026-10-06
+
+- Fixed the AI compaction review layout so it is height-bounded, keeps its controls visible, scrolls proposed entries internally, and cannot cover the stored-memory editor below it.
+- Changed compaction to treat the source as one memory corpus instead of preserving entry boundaries, with a dynamic schema cap that targets substantially fewer output entries.
+- Reworked the compaction prompt around the durable, actionable core and explicitly removes examples, explanations, narrative history, temporary state, repeated qualifiers, and low-value nuance.
+- Require at least 25% exact-character reduction before a proposal is accepted, with substantially tighter first-pass and retry budgets.
+- Added preview metadata for source/output entry counts and actual percentage reduction.
+
 ## 1.5.3 — 2026-10-06
 
 - Added visible in-progress feedback for AI compaction with an activity indicator and live elapsed time while Hermes is generating and validating the preview.

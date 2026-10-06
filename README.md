@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.3
+# Hermes Memory Review 1.5.4
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.3 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.4 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -32,15 +32,18 @@ token usage using Hermes' documented memory-budget scale of 2.75 chars/token. Th
 percentage is based on the exact character limit that Hermes actually enforces.
 
 Choose **Compact with AI** on either target to ask Hermes' active/default model
-for a leaner representation. The model receives the current entries as untrusted
-data and is instructed to preserve distinct facts, preferences, constraints,
-decisions, names, identifiers, relationships, dates, workflow details, and other
-important nuance while removing repetition and excess wording. The prompt includes
-an explicit character budget and encourages fewer entry boundaries when that saves
-space without losing information. If the first proposal is not smaller, Hermes
-automatically retries once with a stricter compression target. While generation is
-running, Desktop shows an activity indicator and live elapsed time. The result is
-shown as a preview with the before/after token estimate and model attribution.
+for a leaner representation. The model receives the current entries as one untrusted
+memory corpus and is explicitly told not to preserve source entry boundaries. It
+extracts the durable, actionable core, merges related facts into a small number of
+thematic entries, and removes examples, explanations, narrative history, temporary
+status, repeated qualifiers, and low-value nuance that would not change a future
+answer or action. The structured output schema also caps the proposal entry count
+based on the source size. A proposal must reduce the exact stored-memory character
+footprint by at least 25%; Hermes automatically retries once with a stricter budget
+when needed. While generation is running, Desktop shows an activity indicator and
+live elapsed time. The review panel is height-bounded with its own scrolling area,
+and reports before/after entry counts, percentage reduction, token estimate, and
+model attribution.
 Preview generation runs through the plugin backend and does not require an open,
 active, or focused chat session.
 Nothing is written until **Apply compaction** is selected. Applying verifies that
@@ -135,5 +138,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.3 is validated under a strict POLIS V6.10.0 contract,
+Version 1.5.4 is validated under a strict POLIS V6.10.0 contract,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.
