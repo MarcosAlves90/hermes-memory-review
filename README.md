@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.4.0
+# Hermes Memory Review 1.5.0
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.4.0 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.0 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -26,7 +26,18 @@ is unavailable.
 edit its complete text, and choose **Save changes** to replace that exact entry.
 The backend delegates the write to Hermes' own `MemoryStore`, so locking, limits,
 content scanning, drift detection, and atomic persistence remain enforced by
-Hermes.
+Hermes. Both targets also show an approximate token footprint using Hermes'
+`estimate_tokens_rough` helper.
+
+Choose **Compact with AI** on either target to ask Hermes' active/default model
+for a leaner representation. The model receives the current entries as untrusted
+data and is instructed to preserve distinct facts, preferences, constraints,
+decisions, names, identifiers, relationships, dates, workflow details, and other
+important nuance while removing repetition and excess wording. The result is
+shown as a preview with the before/after token estimate and model attribution.
+Nothing is written until **Apply compaction** is selected. Applying verifies that
+the source entries have not changed since the preview and then performs one
+atomic `MemoryStore.apply_batch()` update.
 
 ## Commands
 
@@ -42,6 +53,7 @@ Session:
 /memory-review verify [id|all]
 /memory-review path <id|prefix>
 /memory-show <id|prefix>
+/memory-compact-preview <memory|user>
 /memreview ...
 ```
 
@@ -87,13 +99,23 @@ For pending proposals, the backend reads JSON records under the active profile's
 files directly: they call the documented Hermes Desktop SDK gateway path and
 execute Hermes' native `/memory approve|reject <id|all>` commands.
 
-For stored memory, the plugin backend exposes profile-scoped `GET /memory` and
-`PUT /memory/{target}` routes. The PUT route loads Hermes' on-disk store with
+For stored memory, the plugin backend exposes profile-scoped `GET /memory`,
+`PUT /memory/{target}`, and `POST /memory/{target}/compact` routes. The GET route
+reports Hermes' rough token estimate for each target. The PUT route loads Hermes'
+on-disk store with
 `tools.memory_tool.load_on_disk_store()` and calls `MemoryStore.replace()` with
 the complete original entry pinned as the reviewed match. The plugin never
 rewrites `MEMORY.md` or `USER.md` directly, so a stale, invalid, over-budget, or
 blocked replacement is rejected by Hermes instead of silently overwriting newer
 state.
+
+AI preview generation runs through the plugin command context and
+`ctx.llm.complete_structured()` without a provider or model override, so Hermes
+keeps provider selection, credentials, fallback, and the active/default model.
+The preview carries a fingerprint of the exact source entries. The compact POST
+route rejects a stale fingerprint and delegates the complete consolidation to a
+single `MemoryStore.apply_batch()` transaction; failed validation leaves the
+store unchanged.
 
 The equivalent native commands are:
 
@@ -104,5 +126,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.4.0 is validated under a strict POLIS V6.10.0 `feature` contract,
+Version 1.5.0 is validated under a strict POLIS V6.10.0 `feature` contract,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

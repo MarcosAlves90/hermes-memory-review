@@ -8,9 +8,11 @@ Stored-memory edits delegate persistence to Hermes' own ``MemoryStore``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import runpy
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -28,6 +30,11 @@ router = APIRouter()
 class MemoryEditRequest(BaseModel):
     old_text: str
     content: str
+
+
+class MemoryCompactionApplyRequest(BaseModel):
+    source_fingerprint: str
+    entries: List[str]
 
 
 def _settings() -> Dict[str, Any]:
@@ -70,6 +77,33 @@ def _memory_store() -> Any:
     return load_on_disk_store()
 
 
+def _entry_delimiter() -> str:
+    try:
+        from tools.memory_tool_store import ENTRY_DELIMITER
+
+        return ENTRY_DELIMITER
+    except ModuleNotFoundError:
+        return "\n§\n"
+
+
+def _serialize_entries(entries: List[str]) -> str:
+    return _entry_delimiter().join(entries)
+
+
+def _estimate_tokens(text: str) -> int:
+    try:
+        from agent.model_metadata import estimate_tokens_rough
+
+        return int(estimate_tokens_rough(text))
+    except ModuleNotFoundError:
+        return (len(text.encode("utf-8", "replace")) + 3) // 4 if text else 0
+
+
+def _source_fingerprint(entries: List[str]) -> str:
+    payload = json.dumps(list(entries), ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
+
+
 def _memory_target(store: Any, target: str) -> Dict[str, Any]:
     if target not in {"memory", "user"}:
         raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
@@ -77,6 +111,8 @@ def _memory_target(store: Any, target: str) -> Dict[str, Any]:
     return {
         "target": target,
         "count": len(entries),
+        "estimated_tokens": _estimate_tokens(_serialize_entries(list(entries))),
+        "token_estimate_method": "estimate_tokens_rough",
         "entries": [{"index": index, "content": entry} for index, entry in enumerate(entries)],
     }
 
@@ -141,6 +177,48 @@ def replace_stored_memory(target: str, body: MemoryEditRequest) -> Dict[str, Any
 
     store = _memory_store()
     result = store.replace(target, body.old_text, body.content, matched_entry=body.old_text)
+    if not result.get("success"):
+        raise HTTPException(status_code=409, detail=result)
+
+    return {
+        "success": True,
+        "result": result,
+        "target": _memory_target(store, target),
+    }
+
+
+@router.post("/memory/{target}/compact")
+def apply_memory_compaction(target: str, body: MemoryCompactionApplyRequest) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
+
+    proposed = [entry.strip() for entry in body.entries]
+    if not proposed or any(not entry for entry in proposed):
+        raise HTTPException(status_code=400, detail="entries must contain at least one non-empty memory entry.")
+    if len(set(proposed)) != len(proposed):
+        raise HTTPException(status_code=400, detail="entries must not contain duplicates.")
+
+    store = _memory_store()
+    current = list(store.memory_entries if target == "memory" else store.user_entries)
+    if not current:
+        raise HTTPException(status_code=409, detail={"success": False, "error": "Stored memory is empty; there is nothing to compact."})
+    if _source_fingerprint(current) != body.source_fingerprint:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "success": False,
+                "error": "Stored memory changed after this compaction preview was generated. Refresh and create a new preview.",
+            },
+        )
+
+    operations = [
+        {"action": "remove", "old_text": entry, "matched_entry": entry}
+        for entry in current
+    ] + [
+        {"action": "add", "content": entry}
+        for entry in proposed
+    ]
+    result = store.apply_batch(target, operations)
     if not result.get("success"):
         raise HTTPException(status_code=409, detail=result)
 

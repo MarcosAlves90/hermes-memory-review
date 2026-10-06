@@ -120,11 +120,13 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
 
 
 class FakeMemoryStore:
-    def __init__(self, memory=None, user=None, replace_result=None):
+    def __init__(self, memory=None, user=None, replace_result=None, batch_result=None):
         self.memory_entries = list(memory or [])
         self.user_entries = list(user or [])
         self.replace_result = replace_result
+        self.batch_result = batch_result
         self.calls = []
+        self.batch_calls = []
 
     def replace(self, target, old_text, content, matched_entry=None):
         self.calls.append((target, old_text, content, matched_entry))
@@ -135,19 +137,42 @@ class FakeMemoryStore:
         entries[index] = content
         return {"success": True, "message": "Entry replaced.", "replaced_entry": old_text}
 
+    def apply_batch(self, target, operations):
+        self.batch_calls.append((target, operations))
+        if self.batch_result is not None:
+            return self.batch_result
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        working = list(entries)
+        for operation in operations:
+            if operation["action"] == "remove":
+                working.remove(operation["matched_entry"])
+            elif operation["action"] == "add":
+                if operation["content"] not in working:
+                    working.append(operation["content"])
+        if target == "memory":
+            self.memory_entries = working
+        else:
+            self.user_entries = working
+        return {"success": True, "message": "Applied compaction."}
+
 
 def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
     api = load_api()
     store = FakeMemoryStore(memory=["agent note", "second note"], user=["user profile"])
     monkeypatch.setattr(api, "_memory_store", lambda: store)
+    monkeypatch.setattr(api, "_estimate_tokens", lambda text: len(text), raising=False)
 
     response = client_for(api).get("/memory")
     assert response.status_code == 200
-    assert response.json() == {
+    body = response.json()
+    assert "estimated_tokens" in body["targets"]["memory"], "token estimate metadata is required"
+    assert body == {
         "targets": {
             "memory": {
                 "target": "memory",
                 "count": 2,
+                "estimated_tokens": 24,
+                "token_estimate_method": "estimate_tokens_rough",
                 "entries": [
                     {"index": 0, "content": "agent note"},
                     {"index": 1, "content": "second note"},
@@ -156,6 +181,8 @@ def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
             "user": {
                 "target": "user",
                 "count": 1,
+                "estimated_tokens": 12,
+                "token_estimate_method": "estimate_tokens_rough",
                 "entries": [{"index": 0, "content": "user profile"}],
             },
         }
@@ -213,6 +240,68 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "['user', 'User']" in source
     assert "Save changes" in source
     assert "Search stored memory" in source
+    assert "estimated_tokens" in source
+    assert "tokens estimated" in source
+    assert "Compact with AI" in source
+    assert "Apply compaction" in source
+    assert "Cancel preview" in source
+    assert "memory-compact-preview" in source
+
+
+def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["first fact", "second fact"], user=["profile"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    fingerprint = api._source_fingerprint(store.memory_entries)
+
+    response = client_for(api).post(
+        "/memory/memory/compact",
+        json={"source_fingerprint": fingerprint, "entries": ["first and second fact"]},
+    )
+
+    assert response.status_code == 200
+    assert len(store.batch_calls) == 1
+    target, operations = store.batch_calls[0]
+    assert target == "memory"
+    assert operations == [
+        {"action": "remove", "old_text": "first fact", "matched_entry": "first fact"},
+        {"action": "remove", "old_text": "second fact", "matched_entry": "second fact"},
+        {"action": "add", "content": "first and second fact"},
+    ]
+    assert response.json()["target"]["entries"] == [{"index": 0, "content": "first and second fact"}]
+
+
+def test_backend_rejects_stale_compaction_without_mutation(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["newer memory"], user=[])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).post(
+        "/memory/memory/compact",
+        json={"source_fingerprint": api._source_fingerprint(["older memory"]), "entries": ["compact"]},
+    )
+
+    assert response.status_code == 409
+    assert store.batch_calls == []
+    assert store.memory_entries == ["newer memory"]
+
+
+def test_backend_surfaces_compaction_batch_failure_without_partial_write(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(
+        memory=["fact"],
+        batch_result={"success": False, "error": "Compaction rejected."},
+    )
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).post(
+        "/memory/memory/compact",
+        json={"source_fingerprint": api._source_fingerprint(["fact"]), "entries": ["short fact"]},
+    )
+
+    assert response.status_code == 409
+    assert len(store.batch_calls) == 1
+    assert store.memory_entries == ["fact"]
 
 
 def test_backend_returns_not_found_for_unknown_record(monkeypatch, tmp_path):

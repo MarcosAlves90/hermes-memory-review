@@ -1,7 +1,9 @@
 
 import importlib.util
+import json
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,11 +29,12 @@ def load_plugin():
 class FakeCtx:
     profile_name = "default"
 
-    def __init__(self, settings=None, raise_config=False):
+    def __init__(self, settings=None, raise_config=False, llm=None):
         self.settings = settings or {}
         self.raise_config = raise_config
         self.commands = {}
         self.cli_commands = {}
+        self.llm = llm
 
     def get_config(self, key, default=None):
         if self.raise_config:
@@ -50,10 +53,73 @@ def test_registers_supported_commands(tmp_path):
     ctx = FakeCtx({"home_override": str(tmp_path), "default_page_size": 3, "max_page_size": 7})
     plugin.register(ctx)
 
-    assert set(ctx.commands) == {"memory-review", "memreview", "memory-show"}
+    assert set(ctx.commands) == {"memory-review", "memreview", "memory-show", "memory-compact-preview"}
     assert set(ctx.cli_commands) == {"memory-review"}
     assert ctx.commands["memory-review"]["argument_mode"] == "text"
     assert "<id" in ctx.commands["memory-show"]["args_hint"]
+    assert "memory|user" in ctx.commands["memory-compact-preview"]["args_hint"]
+
+
+class FakeLlm:
+    def __init__(self, entries):
+        self.entries = entries
+        self.calls = []
+
+    def complete_structured(self, **kwargs):
+        self.calls.append(kwargs)
+        return SimpleNamespace(
+            parsed={"entries": self.entries},
+            text=json.dumps({"entries": self.entries}),
+            provider="default-provider",
+            model="default-model",
+        )
+
+
+class FakePreviewStore:
+    def __init__(self, memory=None, user=None):
+        self.memory_entries = list(memory or [])
+        self.user_entries = list(user or [])
+
+
+def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    llm = FakeLlm(["fact one; fact two detail"])
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=["fact one", "fact two with detail"], user=["profile fact"])
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    monkeypatch.setattr(plugin, "_estimate_tokens", lambda text: len(text))
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["target"] == "memory"
+    assert result["proposed_entries"] == ["fact one; fact two detail"]
+    assert result["source_fingerprint"] == plugin._source_fingerprint(store.memory_entries)
+    assert result["before_tokens"] > result["after_tokens"]
+    assert result["provider"] == "default-provider"
+    assert result["model"] == "default-model"
+    assert len(llm.calls) == 1
+    call = llm.calls[0]
+    assert "provider" not in call
+    assert "model" not in call
+    assert "untrusted data" in call["instructions"].lower()
+    assert "preserve" in call["instructions"].lower()
+
+
+def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    llm = FakeLlm(["unused"])
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: FakePreviewStore())
+    plugin.register(ctx)
+
+    invalid = json.loads(ctx.commands["memory-compact-preview"]["handler"]("other"))
+    empty = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert invalid["success"] is False
+    assert empty["success"] is False
+    assert llm.calls == []
 
 
 def test_slash_and_shortcut_handlers(tmp_path):

@@ -404,12 +404,15 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
   })
 }
 
-function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
+function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompaction, applyCompaction, source }) {
   const [target, setTarget] = useState('memory')
   const [search, setSearch] = useState('')
   const [selectedText, setSelectedText] = useState('')
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
+  const [compacting, setCompacting] = useState(false)
+  const [applyingCompaction, setApplyingCompaction] = useState(false)
+  const [compactionPreview, setCompactionPreview] = useState(null)
   const [feedback, setFeedback] = useState(null)
 
   const stored = useQuery({
@@ -441,6 +444,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
     setTarget(nextTarget)
     setSelectedText('')
     setSearch('')
+    setCompactionPreview(null)
     setFeedback(null)
   }
 
@@ -460,6 +464,47 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const compact = async () => {
+    setCompacting(true)
+    setCompactionPreview(null)
+    setFeedback(null)
+    try {
+      const preview = await requestCompaction(target)
+      setCompactionPreview(preview)
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setCompacting(false)
+    }
+  }
+
+  const applyPreview = async () => {
+    if (!compactionPreview) return
+    setApplyingCompaction(true)
+    setFeedback(null)
+    try {
+      const result = await applyCompaction(
+        compactionPreview.target,
+        compactionPreview.source_fingerprint,
+        compactionPreview.proposed_entries
+      )
+      setFeedback({ kind: 'success', message: result?.result?.message || 'Memory compaction applied.' })
+      setCompactionPreview(null)
+      setSelectedText('')
+      await stored.refetch()
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setApplyingCompaction(false)
     }
   }
 
@@ -494,13 +539,24 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
               jsx('h1', { className: 'text-base font-semibold', children: 'Stored memory' }),
               jsx('p', {
                 className: 'text-xs text-(--ui-text-tertiary)',
-                children: 'Inspect and edit Hermes built-in memory entries'
+                children: 'Inspect, edit, and compact Hermes built-in memory entries'
               })
             ]
           }),
           jsx('span', {
             className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
             children: `${targetData.count ?? 0} entries`
+          }),
+          jsx('span', {
+            className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
+            children: `~${targetData.estimated_tokens ?? 0} tokens estimated`
+          }),
+          jsx('button', {
+            type: 'button',
+            disabled: compacting || applyingCompaction || !targetData.count,
+            className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+            onClick: compact,
+            children: compacting ? 'Compacting…' : 'Compact with AI'
           }),
           jsx('button', {
             type: 'button',
@@ -515,6 +571,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
         children: STORED_TARGETS.map(([id, label]) =>
           jsx('button', {
             type: 'button',
+            disabled: compacting || applyingCompaction,
             onClick: () => selectTarget(id),
             'aria-pressed': target === id,
             className: `rounded px-2.5 py-1 text-xs ${
@@ -522,7 +579,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
                 ? 'bg-(--chrome-action-hover) font-medium'
                 : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
             }`,
-            children: label
+            children: `${label} · ~${stored.data?.targets?.[id]?.estimated_tokens ?? 0} tokens estimated`
           }, id)
         )
       }),
@@ -532,6 +589,65 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, source }) {
               feedback.kind === 'error' ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'
             }`,
             children: feedback.message
+          })
+        : null,
+      compactionPreview
+        ? jsxs('section', {
+            className: 'border-b border-(--ui-stroke-secondary) bg-(--chrome-action-hover) px-4 py-3',
+            children: [
+              jsxs('div', {
+                className: 'flex flex-wrap items-center gap-2',
+                children: [
+                  jsx('h2', { className: 'mr-auto text-sm font-semibold', children: 'AI compaction preview' }),
+                  jsx('span', {
+                    className: 'text-xs text-(--ui-text-tertiary)',
+                    children: `~${compactionPreview.before_tokens} → ~${compactionPreview.after_tokens} tokens estimated`
+                  }),
+                  jsx('span', {
+                    className: 'text-xs text-(--ui-text-tertiary)',
+                    children: [compactionPreview.provider, compactionPreview.model].filter(Boolean).join(' / ') || 'Default model'
+                  })
+                ]
+              }),
+              jsx('div', {
+                className: 'mt-2 max-h-52 space-y-2 overflow-auto',
+                children: (compactionPreview.proposed_entries || []).map((entry, index) =>
+                  jsxs('div', {
+                    className: 'rounded border border-(--ui-stroke-secondary) bg-(--ui-bg-primary,transparent) p-2.5',
+                    children: [
+                      jsx('div', {
+                        className: 'mb-1 text-[0.6875rem] uppercase tracking-wide text-(--ui-text-tertiary)',
+                        children: `Proposed entry ${index + 1}`
+                      }),
+                      jsx('div', { className: 'whitespace-pre-wrap break-words text-sm', children: entry })
+                    ]
+                  }, `compact:${index}`)
+                )
+              }),
+              jsxs('div', {
+                className: 'mt-3 flex flex-wrap items-center gap-2',
+                children: [
+                  jsx('button', {
+                    type: 'button',
+                    disabled: applyingCompaction,
+                    onClick: applyPreview,
+                    className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs font-medium hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                    children: applyingCompaction ? 'Applying…' : 'Apply compaction'
+                  }),
+                  jsx('button', {
+                    type: 'button',
+                    disabled: applyingCompaction,
+                    onClick: () => setCompactionPreview(null),
+                    className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                    children: 'Cancel preview'
+                  }),
+                  jsx('span', {
+                    className: 'text-xs text-(--ui-text-tertiary)',
+                    children: 'No stored memory changes until Apply compaction is pressed.'
+                  })
+                ]
+              })
+            ]
           })
         : null,
       jsxs('div', {
@@ -661,6 +777,8 @@ function MemoryReviewPage(props) {
             : jsx(StoredMemoryPage, {
                 loadStoredMemory: props.loadStoredMemory,
                 saveStoredMemory: props.saveStoredMemory,
+                requestCompaction: props.requestCompaction,
+                applyCompaction: props.applyCompaction,
                 source: props.source
               })
       })
@@ -681,6 +799,33 @@ export default {
       ctx.rest(`/memory/${encodeURIComponent(target)}`, {
         method: 'PUT',
         body: { old_text: oldText, content }
+      })
+    const requestCompaction = async target => {
+      const activeSessionId = host.state.activeSessionId.get()
+      const focusedSessionId = host.state.focusedSessionId.get()
+      const sessionId = focusedSessionId || activeSessionId
+      if (!sessionId) {
+        throw new Error('Open or focus a Hermes session before generating an AI compaction preview.')
+      }
+      const response = await host.request('slash.exec', {
+        session_id: sessionId,
+        command: `/memory-compact-preview ${target}`
+      })
+      const output = response?.output
+      if (!output) throw new Error('Hermes returned no compaction preview.')
+      let parsed
+      try {
+        parsed = JSON.parse(output)
+      } catch (_error) {
+        throw new Error(output)
+      }
+      if (!parsed?.success) throw new Error(parsed?.error || 'AI compaction preview failed.')
+      return parsed
+    }
+    const applyCompaction = (target, sourceFingerprint, entries) =>
+      ctx.rest(`/memory/${encodeURIComponent(target)}/compact`, {
+        method: 'POST',
+        body: { source_fingerprint: sourceFingerprint, entries }
       })
     const runDecision = async (action, target) => {
       const activeSessionId = host.state.activeSessionId.get()
@@ -706,6 +851,8 @@ export default {
             loadDetail,
             loadStoredMemory,
             saveStoredMemory,
+            requestCompaction,
+            applyCompaction,
             runDecision,
             source: ctx.source
           })

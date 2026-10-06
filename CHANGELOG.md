@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 — 2026-10-06
+
+- Added approximate token usage for both stored `memory` and `user` targets using Hermes' `estimate_tokens_rough` helper.
+- Added **Compact with AI** using Hermes `ctx.llm` with the active/default provider and model, with no provider/model override.
+- Added preview-first compaction with before/after token estimates, model attribution, proposed entries, and explicit **Apply compaction** / **Cancel preview** controls.
+- Added stale-source fingerprint protection and atomic whole-target application through one `MemoryStore.apply_batch()` transaction.
+- Added regression coverage for token metadata, default-model LLM routing, preview/apply separation, stale conflicts, and batch failures without real-memory mutation.
+
 ## 1.4.0 — 2026-10-05
 
 - Added a top-level switch between pending writes and stored memory.
