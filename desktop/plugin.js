@@ -404,12 +404,15 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
   })
 }
 
-function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompaction, applyCompaction, source }) {
+function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory, deleteStoredMemory, requestCompaction, applyCompaction, source }) {
   const [target, setTarget] = useState('memory')
   const [search, setSearch] = useState('')
   const [selectedText, setSelectedText] = useState('')
   const [draft, setDraft] = useState('')
+  const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState(false)
   const [compacting, setCompacting] = useState(false)
   const [compactionElapsed, setCompactionElapsed] = useState(0)
   const [applyingCompaction, setApplyingCompaction] = useState(false)
@@ -433,13 +436,15 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
     [entries, query]
   )
   const selectedEntry = selectedText ? entries.find(entry => entry.content === selectedText) : null
-  const current = selectedText
-    ? selectedEntry || { index: -1, content: selectedText, stale: true }
-    : filtered[0] || entries[0] || null
+  const current = adding
+    ? null
+    : selectedText
+      ? selectedEntry || { index: -1, content: selectedText, stale: true }
+      : filtered[0] || entries[0] || null
 
   useEffect(() => {
-    setDraft(current?.content || '')
-  }, [target, current?.content])
+    if (!adding) setDraft(current?.content || '')
+  }, [target, adding, current?.content])
 
   useEffect(() => {
     if (!compacting) return undefined
@@ -454,8 +459,46 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
     setTarget(nextTarget)
     setSelectedText('')
     setSearch('')
+    setAdding(false)
+    setDeleteConfirm(false)
     setCompactionPreview(null)
     setFeedback(null)
+  }
+
+  const selectEntry = content => {
+    setAdding(false)
+    setDeleteConfirm(false)
+    setSelectedText(content)
+  }
+
+  const beginAdd = () => {
+    setAdding(true)
+    setSelectedText('')
+    setDraft('')
+    setDeleteConfirm(false)
+    setCompactionPreview(null)
+    setFeedback(null)
+  }
+
+  const add = async () => {
+    const content = draft.trim()
+    if (!content) return
+    setSaving(true)
+    setFeedback(null)
+    try {
+      const result = await addStoredMemory(target, content)
+      setFeedback({ kind: 'success', message: result?.result?.message || 'Memory entry added.' })
+      setAdding(false)
+      setSelectedText(content)
+      await stored.refetch()
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setSaving(false)
+    }
   }
 
   const save = async () => {
@@ -466,6 +509,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
       const result = await saveStoredMemory(target, current.content, draft)
       setFeedback({ kind: 'success', message: result?.result?.message || 'Memory entry updated.' })
       setSelectedText(draft.trim())
+      setDeleteConfirm(false)
       await stored.refetch()
     } catch (error) {
       setFeedback({
@@ -474,6 +518,30 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
       })
     } finally {
       setSaving(false)
+    }
+  }
+
+  const remove = async () => {
+    if (!current || current.stale) return
+    if (!deleteConfirm) {
+      setDeleteConfirm(true)
+      return
+    }
+    setDeleting(true)
+    setFeedback(null)
+    try {
+      const result = await deleteStoredMemory(target, current.content)
+      setFeedback({ kind: 'success', message: result?.result?.message || 'Memory entry removed.' })
+      setSelectedText('')
+      setDeleteConfirm(false)
+      await stored.refetch()
+    } catch (error) {
+      setFeedback({
+        kind: 'error',
+        message: error instanceof Error ? error.message : String(error)
+      })
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -568,7 +636,14 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
           }),
           jsx('button', {
             type: 'button',
-            disabled: compacting || applyingCompaction || !targetData.count,
+            disabled: compacting || applyingCompaction || saving || deleting,
+            className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+            onClick: beginAdd,
+            children: 'Add entry'
+          }),
+          jsx('button', {
+            type: 'button',
+            disabled: compacting || applyingCompaction || saving || deleting || !targetData.count,
             className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1.5 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
             onClick: compact,
             children: compacting ? 'Compacting…' : 'Compact with AI'
@@ -586,7 +661,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
         children: STORED_TARGETS.map(([id, label]) =>
           jsx('button', {
             type: 'button',
-            disabled: compacting || applyingCompaction,
+            disabled: compacting || applyingCompaction || saving || deleting,
             onClick: () => selectTarget(id),
             'aria-pressed': target === id,
             className: `rounded px-2.5 py-1 text-xs ${
@@ -730,7 +805,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                       children: filtered.map(entry =>
                         jsx('button', {
                           type: 'button',
-                          onClick: () => setSelectedText(entry.content),
+                          onClick: () => selectEntry(entry.content),
                           className: `mb-1 block w-full rounded px-2.5 py-2 text-left transition-colors ${
                             current?.content === entry.content
                               ? 'bg-(--chrome-action-hover)'
@@ -745,8 +820,52 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                     })
             ]
           }),
-          current
+          adding
             ? jsxs('main', {
+                className: 'flex min-h-0 min-w-0 flex-col',
+                children: [
+                  jsxs('div', {
+                    className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-2',
+                    children: [
+                      jsx('span', {
+                        className: 'mr-auto text-xs text-(--ui-text-tertiary)',
+                        children: `New ${target === 'memory' ? 'MEMORY.md' : 'USER.md'} entry`
+                      }),
+                      jsx('button', {
+                        type: 'button',
+                        disabled: saving,
+                        onClick: () => setAdding(false),
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: 'Cancel'
+                      }),
+                      jsx('button', {
+                        type: 'button',
+                        disabled: saving || !draft.trim(),
+                        onClick: add,
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs font-medium hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: saving ? 'Adding…' : 'Add entry'
+                      })
+                    ]
+                  }),
+                  jsx('textarea', {
+                    value: draft,
+                    onChange: event => {
+                      setDraft(event.target.value)
+                      setDeleteConfirm(false)
+                    },
+                    'aria-label': `Add ${target} memory entry`,
+                    placeholder: 'Enter a durable memory entry…',
+                    className: 'min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed outline-none',
+                    spellCheck: false
+                  }),
+                  jsx('div', {
+                    className: 'border-t border-(--ui-stroke-secondary) px-4 py-2 text-xs text-(--ui-text-tertiary)',
+                    children: 'Adding delegates to Hermes MemoryStore validation, limits, locking, and persistence.'
+                  })
+                ]
+              })
+            : current
+              ? jsxs('main', {
                 className: 'flex min-h-0 min-w-0 flex-col',
                 children: [
                   jsxs('div', {
@@ -764,12 +883,22 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                         onClick: save,
                         className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
                         children: saving ? 'Saving…' : 'Save changes'
+                      }),
+                      jsx('button', {
+                        type: 'button',
+                        disabled: saving || deleting || current.stale,
+                        onClick: remove,
+                        className: 'rounded border border-(--ui-stroke-secondary) px-2.5 py-1 text-xs hover:bg-(--chrome-action-hover) disabled:opacity-50',
+                        children: deleting ? 'Deleting…' : deleteConfirm ? 'Confirm delete' : 'Delete entry'
                       })
                     ]
                   }),
                   jsx('textarea', {
                     value: draft,
-                    onChange: event => setDraft(event.target.value),
+                    onChange: event => {
+                      setDraft(event.target.value)
+                      setDeleteConfirm(false)
+                    },
                     'aria-label': `Edit ${target} memory entry`,
                     className: 'min-h-0 flex-1 resize-none bg-transparent p-4 text-sm leading-relaxed outline-none',
                     spellCheck: false
@@ -786,7 +915,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                   })
                 ]
               })
-            : jsx('div', {
+              : jsx('div', {
                 className: 'flex min-h-0 flex-1 items-center justify-center p-6 text-sm text-(--ui-text-tertiary)',
                 children: `No ${target} entry selected.`
               })
@@ -828,6 +957,8 @@ function MemoryReviewPage(props) {
             : jsx(StoredMemoryPage, {
                 loadStoredMemory: props.loadStoredMemory,
                 saveStoredMemory: props.saveStoredMemory,
+                addStoredMemory: props.addStoredMemory,
+                deleteStoredMemory: props.deleteStoredMemory,
                 requestCompaction: props.requestCompaction,
                 applyCompaction: props.applyCompaction,
                 source: props.source
@@ -850,6 +981,16 @@ export default {
       ctx.rest(`/memory/${encodeURIComponent(target)}`, {
         method: 'PUT',
         body: { old_text: oldText, content }
+      })
+    const addStoredMemory = (target, content) =>
+      ctx.rest(`/memory/${encodeURIComponent(target)}/entries`, {
+        method: 'POST',
+        body: { content }
+      })
+    const deleteStoredMemory = (target, oldText) =>
+      ctx.rest(`/memory/${encodeURIComponent(target)}/entries`, {
+        method: 'DELETE',
+        body: { old_text: oldText }
       })
     const requestCompaction = async target => {
       const parsed = await ctx.rest(`/memory/${encodeURIComponent(target)}/compact/preview`, {
@@ -887,6 +1028,8 @@ export default {
             loadDetail,
             loadStoredMemory,
             saveStoredMemory,
+            addStoredMemory,
+            deleteStoredMemory,
             requestCompaction,
             applyCompaction,
             runDecision,

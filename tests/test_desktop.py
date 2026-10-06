@@ -126,6 +126,8 @@ class FakeMemoryStore:
         memory=None,
         user=None,
         replace_result=None,
+        add_result=None,
+        remove_result=None,
         batch_result=None,
         memory_char_limit=2200,
         user_char_limit=1375,
@@ -133,10 +135,14 @@ class FakeMemoryStore:
         self.memory_entries = list(memory or [])
         self.user_entries = list(user or [])
         self.replace_result = replace_result
+        self.add_result = add_result
+        self.remove_result = remove_result
         self.batch_result = batch_result
         self.memory_char_limit = memory_char_limit
         self.user_char_limit = user_char_limit
         self.calls = []
+        self.add_calls = []
+        self.remove_calls = []
         self.batch_calls = []
 
     def _char_count(self, target):
@@ -154,6 +160,23 @@ class FakeMemoryStore:
         index = entries.index(matched_entry)
         entries[index] = content
         return {"success": True, "message": "Entry replaced.", "replaced_entry": old_text}
+
+    def add(self, target, content):
+        self.add_calls.append((target, content))
+        if self.add_result is not None:
+            return self.add_result
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        if content not in entries:
+            entries.append(content)
+        return {"success": True, "message": "Entry added."}
+
+    def remove(self, target, old_text, matched_entry=None):
+        self.remove_calls.append((target, old_text, matched_entry))
+        if self.remove_result is not None:
+            return self.remove_result
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        entries.remove(matched_entry)
+        return {"success": True, "message": "Entry removed.", "previous_content": matched_entry}
 
     def apply_batch(self, target, operations):
         self.batch_calls.append((target, operations))
@@ -245,6 +268,59 @@ def test_backend_replaces_exact_stored_memory_entry(monkeypatch):
     assert body["target"]["entries"] == [{"index": 0, "content": "new entry"}]
 
 
+def test_backend_adds_stored_memory_entry_through_memory_store(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["existing"], user=["profile"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).post("/memory/memory/entries", json={"content": "new entry"})
+
+    assert response.status_code == 200
+    assert store.add_calls == [("memory", "new entry")]
+    assert response.json()["target"]["entries"] == [
+        {"index": 0, "content": "existing"},
+        {"index": 1, "content": "new entry"},
+    ]
+
+
+def test_backend_deletes_exact_stored_memory_entry_through_memory_store(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(memory=["keep", "remove me"], user=["profile"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).request(
+        "DELETE",
+        "/memory/memory/entries",
+        json={"old_text": "remove me"},
+    )
+
+    assert response.status_code == 200
+    assert store.remove_calls == [("memory", "remove me", "remove me")]
+    assert response.json()["target"]["entries"] == [{"index": 0, "content": "keep"}]
+
+
+def test_backend_surfaces_add_remove_failures_without_mutation_success(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(
+        memory=["existing"],
+        add_result={"success": False, "error": "Memory limit exceeded."},
+        remove_result={"success": False, "error": "Entry changed since it was reviewed."},
+    )
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    add_response = client_for(api).post("/memory/memory/entries", json={"content": "too large"})
+    remove_response = client_for(api).request(
+        "DELETE",
+        "/memory/memory/entries",
+        json={"old_text": "existing"},
+    )
+
+    assert add_response.status_code == 409
+    assert remove_response.status_code == 409
+    assert add_response.json()["detail"]["success"] is False
+    assert remove_response.json()["detail"]["success"] is False
+
+
 def test_backend_rejects_invalid_stored_memory_target(monkeypatch):
     api = load_api()
     monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore())
@@ -279,6 +355,9 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "['memory', 'Memory']" in source
     assert "['user', 'User']" in source
     assert "Save changes" in source
+    assert "Add entry" in source
+    assert "Delete entry" in source
+    assert "Confirm delete" in source
     assert "Search stored memory" in source
     assert "estimated_tokens" in source
     assert "estimated_token_limit" in source
@@ -310,6 +389,7 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "slash.exec" not in preview_source
     assert "activeSessionId" not in preview_source
     assert "focusedSessionId" not in preview_source
+    assert "/entries" in source
 
 
 def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch):

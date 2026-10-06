@@ -38,6 +38,14 @@ class MemoryEditRequest(BaseModel):
     content: str
 
 
+class MemoryAddRequest(BaseModel):
+    content: str
+
+
+class MemoryDeleteRequest(BaseModel):
+    old_text: str
+
+
 class MemoryCompactionApplyRequest(BaseModel):
     source_fingerprint: str
     entries: List[str]
@@ -192,6 +200,40 @@ def replace_stored_memory(target: str, body: MemoryEditRequest) -> Dict[str, Any
 
     store = _memory_store()
     result = store.replace(target, body.old_text, body.content, matched_entry=body.old_text)
+    if not result.get("success"):
+        raise HTTPException(status_code=409, detail=result)
+
+    return {
+        "success": True,
+        "result": result,
+        "target": _memory_target(store, target),
+    }
+
+
+@router.post("/memory/{target}/entries")
+def add_stored_memory(target: str, body: MemoryAddRequest) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
+
+    store = _memory_store()
+    result = store.add(target, body.content)
+    if not result.get("success"):
+        raise HTTPException(status_code=409, detail=result)
+
+    return {
+        "success": True,
+        "result": result,
+        "target": _memory_target(store, target),
+    }
+
+
+@router.delete("/memory/{target}/entries")
+def delete_stored_memory(target: str, body: MemoryDeleteRequest) -> Dict[str, Any]:
+    if target not in {"memory", "user"}:
+        raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
+
+    store = _memory_store()
+    result = store.remove(target, body.old_text, matched_entry=body.old_text)
     if not result.get("success"):
         raise HTTPException(status_code=409, detail=result)
 
