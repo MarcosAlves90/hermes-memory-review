@@ -524,7 +524,7 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     stored_start = source.index("function StoredMemoryPage")
     stored_end = source.index("function MemoryReviewPage", stored_start)
     stored_source = source[stored_start:stored_end]
-    assert "max-h-[40vh]" in stored_source
+    assert "max-h-[44vh]" in stored_source
     assert "shrink-0" in stored_source
     assert "overflow-hidden" in stored_source
     assert "before_entry_count" in stored_source
@@ -540,6 +540,22 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "activeSessionId" not in preview_source
     assert "focusedSessionId" not in preview_source
     assert "/entries" in source
+
+
+def test_desktop_dashboard_uses_lightweight_reactive_ui_patterns():
+    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
+    assert "function StatCard" in source
+    assert "function UsageBar" in source
+    assert "function EmptyState" in source
+    assert "function LoadingRows" in source
+    assert "duration-100" in source
+    assert "duration-150" in source
+    assert "motion-reduce:transition-none" in source
+    assert "animate-in fade-in-0" in source
+    assert "animate-pulse" in source
+    assert "framer-motion" not in source
+    assert "gsap" not in source
+    assert "lottie" not in source
 
 
 def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch):

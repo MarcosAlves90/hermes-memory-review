@@ -1,23 +1,31 @@
-# Hermes Memory Review 1.5.10
+# Hermes Memory Review 1.6.0
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.10 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.6.0 provides a native **Memory Review** workspace in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
 2. Enable the Desktop **Memory Review** plugin in the same Plugins screen.
 3. Open **Memory Review** from the Desktop sidebar.
 
-Use the top switch to alternate between **Pending writes** and **Stored memory**.
-Pending writes support local search and refresh, and open on a
-formatted **Overview** that presents metadata and proposed changes as readable
-fields. **Proposal**, **Diff**, **Raw**, and **Verify** remain available for
-technical inspection. Text in all five inspection views is selectable, so standard
-copy shortcuts work directly from the review pane. Each pending write can be approved or rejected in place;
+Use the compact workspace switch to alternate between **Pending writes** and
+**Stored memory**. The dashboard is organized around task state rather than raw
+records: queue/budget metrics stay visible, actions are contextual, search reports
+its filtered count, selected records are visually distinct, and loading/empty/error
+states explain the next useful action. Short 100–150 ms transitions, fade-ins,
+progress movement, and loading pulses provide feedback without an animation library;
+reduced-motion preferences disable transition motion.
+
+Pending writes open on a formatted **Overview** with proposal status, metadata,
+intent, and readable operation cards. **Proposal**, **Diff**, **Raw**, and **Verify**
+remain available for deeper inspection. Text in all five inspection views is
+selectable, so standard copy shortcuts work directly from the review pane. Queue
+health shows total, ready, and attention-required proposals; obsolete/unverifiable
+items are visually distinct. Each pending write can be approved or rejected in place;
 **Approve all** and **Reject all** require an explicit confirmation click. It
 polls every five seconds so changes remain visible even when a live plugin socket
 is unavailable. Approval and rejection run through the plugin backend and do not
@@ -27,9 +35,11 @@ has already been deleted, the proposal
 is marked obsolete, approval is disabled, and **Delete obsolete** rejects/removes
 the stale proposal through Hermes' native memory decision path.
 
-**Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User**
-(`USER.md`) views. Every stored entry is listed and searchable. Select an entry,
-edit its complete text, and choose **Save changes** to replace that exact entry.
+**Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User** (`USER.md`)
+views with entry count, character usage, estimated tokens, free capacity, and a live
+budget bar. Every stored entry is listed with its size and is searchable. Select an
+entry, edit its complete text, and choose **Save changes** to replace that exact entry;
+the editor distinguishes saved, unsaved, and externally stale states.
 Use **Add entry** to create a new entry in the active target. **Delete entry** uses
 a second **Confirm delete** click before removing the selected exact entry.
 The backend delegates the write to Hermes' own `MemoryStore`, so locking, limits,
@@ -155,5 +165,5 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.5.10 passes the repository verification suite: complete tests, Cobertura
+Version 1.6.0 passes the repository verification suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.

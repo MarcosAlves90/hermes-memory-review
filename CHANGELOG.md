@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.0 — 2026-10-06
+
+- Redesigned the Desktop dashboard around two clear workflows: reviewing pending proposals and maintaining stored memory, with stronger hierarchy, contextual actions, responsive layouts, and clearer empty/loading/error states.
+- Added lightweight reactive polish using native CSS/Tailwind transitions, short fade-ins, progress animation, and loading pulses with reduced-motion support; no animation dependency was added.
+- Pending review now exposes queue health metrics, filtered-result counts, status-aware proposal cards, a clearer decision header, and progressive Overview/Proposal/Diff/Raw/Verify inspection.
+- Stored memory now exposes budget metrics and a live usage bar, clearer Memory/User switching, search result counts, richer entry cards, unsaved/stale editor states, character counts, and a structured AI-compaction review panel.
+
 ## 1.5.10 — 2026-10-06
 
 - Pending-write inspection text is now selectable in **Overview**, **Proposal**, **Diff**, **Raw**, and **Verify**, so standard drag-selection plus copy shortcuts work in Hermes Desktop.
