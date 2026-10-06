@@ -288,6 +288,10 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "used" in source
     assert "tokens estimated" in source
     assert "Compact with AI" in source
+    assert "AI compaction in progress" in source
+    assert "compactionElapsed" in source
+    assert "setInterval" in source
+    assert "automatically retry" in source
     assert "Apply compaction" in source
     assert "Cancel preview" in source
     preview_start = source.index("const requestCompaction")

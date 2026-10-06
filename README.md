@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.2
+# Hermes Memory Review 1.5.3
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.2 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.3 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -35,7 +35,11 @@ Choose **Compact with AI** on either target to ask Hermes' active/default model
 for a leaner representation. The model receives the current entries as untrusted
 data and is instructed to preserve distinct facts, preferences, constraints,
 decisions, names, identifiers, relationships, dates, workflow details, and other
-important nuance while removing repetition and excess wording. The result is
+important nuance while removing repetition and excess wording. The prompt includes
+an explicit character budget and encourages fewer entry boundaries when that saves
+space without losing information. If the first proposal is not smaller, Hermes
+automatically retries once with a stricter compression target. While generation is
+running, Desktop shows an activity indicator and live elapsed time. The result is
 shown as a preview with the before/after token estimate and model attribution.
 Preview generation runs through the plugin backend and does not require an open,
 active, or focused chat session.
@@ -131,5 +135,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.2 is validated under a strict POLIS V6.10.0 contract,
+Version 1.5.3 is validated under a strict POLIS V6.10.0 contract,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

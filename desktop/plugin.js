@@ -411,6 +411,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
   const [draft, setDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [compacting, setCompacting] = useState(false)
+  const [compactionElapsed, setCompactionElapsed] = useState(0)
   const [applyingCompaction, setApplyingCompaction] = useState(false)
   const [compactionPreview, setCompactionPreview] = useState(null)
   const [feedback, setFeedback] = useState(null)
@@ -440,6 +441,15 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
     setDraft(current?.content || '')
   }, [target, current?.content])
 
+  useEffect(() => {
+    if (!compacting) return undefined
+    const startedAt = Date.now()
+    const updateElapsed = () => setCompactionElapsed(Math.floor((Date.now() - startedAt) / 1000))
+    updateElapsed()
+    const timer = setInterval(updateElapsed, 1000)
+    return () => clearInterval(timer)
+  }, [compacting])
+
   const selectTarget = nextTarget => {
     setTarget(nextTarget)
     setSelectedText('')
@@ -468,6 +478,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
   }
 
   const compact = async () => {
+    setCompactionElapsed(0)
     setCompacting(true)
     setCompactionPreview(null)
     setFeedback(null)
@@ -595,6 +606,34 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
             children: feedback.message
           })
         : null,
+      compacting
+        ? jsxs('section', {
+            className: 'border-b border-(--ui-stroke-secondary) px-4 py-3',
+            children: [
+              jsxs('div', {
+                className: 'flex items-center gap-2 text-sm font-medium',
+                children: [
+                  jsx('span', { className: 'inline-block h-2 w-2 animate-pulse rounded-full bg-(--ui-accent)' }),
+                  jsx('span', { children: 'AI compaction in progress' })
+                ]
+              }),
+              jsx('div', {
+                className: 'mt-1 text-xs text-(--ui-text-tertiary)',
+                children: `Request sent to Hermes · ${compactionElapsed}s elapsed`
+              }),
+              jsx('div', {
+                className: 'mt-2 h-1.5 overflow-hidden rounded-full bg-(--chrome-action-hover)',
+                children: jsx('div', {
+                  className: 'h-full w-2/3 animate-pulse rounded-full bg-(--ui-accent)'
+                })
+              }),
+              jsx('div', {
+                className: 'mt-2 text-xs text-(--ui-text-tertiary)',
+                children: 'Hermes is generating and validating a smaller proposal; if needed, it will automatically retry with a stricter compression budget.'
+              })
+            ]
+          })
+        : null,
       compactionPreview
         ? jsxs('section', {
             className: 'border-b border-(--ui-stroke-secondary) bg-(--chrome-action-hover) px-4 py-3',
@@ -610,6 +649,10 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                   jsx('span', {
                     className: 'text-xs text-(--ui-text-tertiary)',
                     children: [compactionPreview.provider, compactionPreview.model].filter(Boolean).join(' / ') || 'Default model'
+                  }),
+                  jsx('span', {
+                    className: 'text-xs text-(--ui-text-tertiary)',
+                    children: `${compactionPreview.attempts || 1} AI attempt${(compactionPreview.attempts || 1) === 1 ? '' : 's'}`
                   })
                 ]
               }),

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.5.3 — 2026-10-06
+
+- Added visible in-progress feedback for AI compaction with an activity indicator and live elapsed time while Hermes is generating and validating the preview.
+- Strengthened the compaction prompt with an explicit character budget, tighter compression guidance, and a preference for fewer entry-boundary overheads without dropping unique information.
+- Added one automatic retry with a stricter target when the first AI proposal does not reduce the exact stored-memory character footprint.
+- Changed compaction acceptance to the exact character footprint Hermes enforces; token counts remain informational estimates.
+
 ## 1.5.2 — 2026-10-06
 
 - Fixed **Compact with AI** so preview generation no longer requires an open, active, or focused Hermes chat session.

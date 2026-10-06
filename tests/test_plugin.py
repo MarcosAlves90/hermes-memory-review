@@ -91,6 +91,22 @@ class FakeLlm:
         )
 
 
+class FakeSequenceLlm:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def complete_structured(self, **kwargs):
+        self.calls.append(kwargs)
+        entries = self.responses[len(self.calls) - 1]
+        return SimpleNamespace(
+            parsed={"entries": entries},
+            text=json.dumps({"entries": entries}),
+            provider="default-provider",
+            model="default-model",
+        )
+
+
 class FakePreviewStore:
     def __init__(self, memory=None, user=None):
         self.memory_entries = list(memory or [])
@@ -121,6 +137,31 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     assert "model" not in call
     assert "untrusted data" in call["instructions"].lower()
     assert "preserve" in call["instructions"].lower()
+
+
+def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprint(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = ["The user prefers concise answers.", "The user values precise technical detail."]
+    llm = FakeSequenceLlm(
+        [
+            original,
+            ["Prefers concise answers with precise technical detail."],
+        ]
+    )
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["attempts"] == 2
+    assert len(llm.calls) == 2
+    assert "strictly smaller" in llm.calls[0]["instructions"].lower()
+    assert "hard output budget" in llm.calls[0]["instructions"].lower()
+    assert "previous proposal" in llm.calls[1]["instructions"].lower()
+    assert result["after_tokens"] < result["before_tokens"]
 
 
 def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):
