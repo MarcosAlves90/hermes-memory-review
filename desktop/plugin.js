@@ -549,7 +549,11 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
           }),
           jsx('span', {
             className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
-            children: `~${targetData.estimated_tokens ?? 0} tokens estimated`
+            children: `~${targetData.estimated_tokens ?? 0} / ~${targetData.estimated_token_limit ?? 0} tokens estimated · ${targetData.usage_percent ?? 0}% used`
+          }),
+          jsx('span', {
+            className: 'rounded-full border border-(--ui-stroke-secondary) px-2 py-0.5 text-[0.6875rem] text-(--ui-text-tertiary)',
+            children: `${targetData.used_chars ?? 0} / ${targetData.char_limit ?? 0} chars`
           }),
           jsx('button', {
             type: 'button',
@@ -579,7 +583,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, requestCompactio
                 ? 'bg-(--chrome-action-hover) font-medium'
                 : 'text-(--ui-text-tertiary) hover:bg-(--chrome-action-hover)'
             }`,
-            children: `${label} · ~${stored.data?.targets?.[id]?.estimated_tokens ?? 0} tokens estimated`
+            children: `${label} · ${stored.data?.targets?.[id]?.usage_percent ?? 0}% used`
           }, id)
         )
       }),

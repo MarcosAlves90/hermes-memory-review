@@ -120,13 +120,30 @@ def test_backend_lists_and_renders_pending_records(monkeypatch, tmp_path):
 
 
 class FakeMemoryStore:
-    def __init__(self, memory=None, user=None, replace_result=None, batch_result=None):
+    def __init__(
+        self,
+        memory=None,
+        user=None,
+        replace_result=None,
+        batch_result=None,
+        memory_char_limit=2200,
+        user_char_limit=1375,
+    ):
         self.memory_entries = list(memory or [])
         self.user_entries = list(user or [])
         self.replace_result = replace_result
         self.batch_result = batch_result
+        self.memory_char_limit = memory_char_limit
+        self.user_char_limit = user_char_limit
         self.calls = []
         self.batch_calls = []
+
+    def _char_count(self, target):
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        return len("\n§\n".join(entries))
+
+    def _char_limit(self, target):
+        return self.memory_char_limit if target == "memory" else self.user_char_limit
 
     def replace(self, target, old_text, content, matched_entry=None):
         self.calls.append((target, old_text, content, matched_entry))
@@ -160,7 +177,6 @@ def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
     api = load_api()
     store = FakeMemoryStore(memory=["agent note", "second note"], user=["user profile"])
     monkeypatch.setattr(api, "_memory_store", lambda: store)
-    monkeypatch.setattr(api, "_estimate_tokens", lambda text: len(text), raising=False)
 
     response = client_for(api).get("/memory")
     assert response.status_code == 200
@@ -171,8 +187,12 @@ def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
             "memory": {
                 "target": "memory",
                 "count": 2,
-                "estimated_tokens": 24,
-                "token_estimate_method": "estimate_tokens_rough",
+                "used_chars": 24,
+                "char_limit": 2200,
+                "usage_percent": 1.1,
+                "estimated_tokens": 9,
+                "estimated_token_limit": 800,
+                "token_estimate_method": "hermes_memory_budget_2.75_chars_per_token",
                 "entries": [
                     {"index": 0, "content": "agent note"},
                     {"index": 1, "content": "second note"},
@@ -181,8 +201,12 @@ def test_backend_lists_stored_memory_for_both_targets(monkeypatch):
             "user": {
                 "target": "user",
                 "count": 1,
-                "estimated_tokens": 12,
-                "token_estimate_method": "estimate_tokens_rough",
+                "used_chars": 12,
+                "char_limit": 1375,
+                "usage_percent": 0.9,
+                "estimated_tokens": 4,
+                "estimated_token_limit": 500,
+                "token_estimate_method": "hermes_memory_budget_2.75_chars_per_token",
                 "entries": [{"index": 0, "content": "user profile"}],
             },
         }
@@ -241,6 +265,11 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "Save changes" in source
     assert "Search stored memory" in source
     assert "estimated_tokens" in source
+    assert "estimated_token_limit" in source
+    assert "usage_percent" in source
+    assert "used_chars" in source
+    assert "char_limit" in source
+    assert "used" in source
     assert "tokens estimated" in source
     assert "Compact with AI" in source
     assert "Apply compaction" in source

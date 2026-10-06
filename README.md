@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.0
+# Hermes Memory Review 1.5.1
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.0 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.1 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -26,8 +26,10 @@ is unavailable.
 edit its complete text, and choose **Save changes** to replace that exact entry.
 The backend delegates the write to Hermes' own `MemoryStore`, so locking, limits,
 content scanning, drift detection, and atomic persistence remain enforced by
-Hermes. Both targets also show an approximate token footprint using Hermes'
-`estimate_tokens_rough` helper.
+Hermes. Both targets also show exact character usage against the active profile's
+configured `memory_char_limit` / `user_char_limit`, plus the equivalent approximate
+token usage using Hermes' documented memory-budget scale of 2.75 chars/token. The
+percentage is based on the exact character limit that Hermes actually enforces.
 
 Choose **Compact with AI** on either target to ask Hermes' active/default model
 for a leaner representation. The model receives the current entries as untrusted
@@ -126,5 +128,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.0 is validated under a strict POLIS V6.10.0 `feature` contract,
+Version 1.5.1 is validated under a strict POLIS V6.10.0 contract,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

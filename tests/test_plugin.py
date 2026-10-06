@@ -87,7 +87,6 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
     store = FakePreviewStore(memory=["fact one", "fact two with detail"], user=["profile fact"])
     monkeypatch.setattr(plugin, "_memory_store", lambda: store)
-    monkeypatch.setattr(plugin, "_estimate_tokens", lambda text: len(text))
     plugin.register(ctx)
 
     result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
@@ -97,6 +96,7 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     assert result["proposed_entries"] == ["fact one; fact two detail"]
     assert result["source_fingerprint"] == plugin._source_fingerprint(store.memory_entries)
     assert result["before_tokens"] > result["after_tokens"]
+    assert result["token_estimate_method"] == "hermes_memory_budget_2.75_chars_per_token"
     assert result["provider"] == "default-provider"
     assert result["model"] == "default-model"
     assert len(llm.calls) == 1

@@ -26,6 +26,9 @@ resolve_hermes_home = _core["resolve_hermes_home"]
 
 router = APIRouter()
 
+_MEMORY_CHARS_PER_TOKEN = 2.75
+_TOKEN_ESTIMATE_METHOD = "hermes_memory_budget_2.75_chars_per_token"
+
 
 class MemoryEditRequest(BaseModel):
     old_text: str
@@ -91,12 +94,7 @@ def _serialize_entries(entries: List[str]) -> str:
 
 
 def _estimate_tokens(text: str) -> int:
-    try:
-        from agent.model_metadata import estimate_tokens_rough
-
-        return int(estimate_tokens_rough(text))
-    except ModuleNotFoundError:
-        return (len(text.encode("utf-8", "replace")) + 3) // 4 if text else 0
+    return int(round(len(text) / _MEMORY_CHARS_PER_TOKEN)) if text else 0
 
 
 def _source_fingerprint(entries: List[str]) -> str:
@@ -108,11 +106,17 @@ def _memory_target(store: Any, target: str) -> Dict[str, Any]:
     if target not in {"memory", "user"}:
         raise HTTPException(status_code=400, detail="target must be 'memory' or 'user'.")
     entries = store.memory_entries if target == "memory" else store.user_entries
+    used_chars = int(store._char_count(target))
+    char_limit = int(store._char_limit(target))
     return {
         "target": target,
         "count": len(entries),
-        "estimated_tokens": _estimate_tokens(_serialize_entries(list(entries))),
-        "token_estimate_method": "estimate_tokens_rough",
+        "used_chars": used_chars,
+        "char_limit": char_limit,
+        "usage_percent": round((used_chars / char_limit) * 100, 1) if char_limit > 0 else 0.0,
+        "estimated_tokens": int(round(used_chars / _MEMORY_CHARS_PER_TOKEN)),
+        "estimated_token_limit": int(round(char_limit / _MEMORY_CHARS_PER_TOKEN)),
+        "token_estimate_method": _TOKEN_ESTIMATE_METHOD,
         "entries": [{"index": index, "content": entry} for index, entry in enumerate(entries)],
     }
 

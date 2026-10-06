@@ -14,6 +14,10 @@ from typing import List
 from .core import MemoryReview, resolve_hermes_home, tokenize
 
 
+_MEMORY_CHARS_PER_TOKEN = 2.75
+_TOKEN_ESTIMATE_METHOD = "hermes_memory_budget_2.75_chars_per_token"
+
+
 def _review(ctx) -> MemoryReview:
     override = ""
     default_page_size = 20
@@ -78,12 +82,7 @@ def _serialize_entries(entries: List[str]) -> str:
 
 
 def _estimate_tokens(text: str) -> int:
-    try:
-        from agent.model_metadata import estimate_tokens_rough
-
-        return int(estimate_tokens_rough(text))
-    except ModuleNotFoundError:
-        return (len(text.encode("utf-8", "replace")) + 3) // 4 if text else 0
+    return int(round(len(text) / _MEMORY_CHARS_PER_TOKEN)) if text else 0
 
 
 def _source_fingerprint(entries: List[str]) -> str:
@@ -166,6 +165,7 @@ def _compact_preview(ctx, raw_args: str) -> str:
             "error": "AI proposal did not reduce the estimated token footprint; memory was not changed.",
             "before_tokens": before_tokens,
             "after_tokens": after_tokens,
+            "token_estimate_method": _TOKEN_ESTIMATE_METHOD,
         })
 
     return json.dumps({
@@ -174,6 +174,7 @@ def _compact_preview(ctx, raw_args: str) -> str:
         "source_fingerprint": _source_fingerprint(entries),
         "before_tokens": before_tokens,
         "after_tokens": after_tokens,
+        "token_estimate_method": _TOKEN_ESTIMATE_METHOD,
         "provider": getattr(result, "provider", "") or "",
         "model": getattr(result, "model", "") or "",
         "proposed_entries": proposed,

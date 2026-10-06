@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.1 — 2026-10-06
+
+- Fixed Stored memory token estimates to use Hermes' documented memory-budget scale of 2.75 chars/token instead of the generic model token estimator.
+- Added exact character usage/limit and percentage used for both `memory` and `user`, using the active profile's configured MemoryStore limits.
+- Aligned AI compaction before/after token estimates with the same Hermes memory-budget scale.
+
 ## 1.5.0 — 2026-10-06
 
 - Added approximate token usage for both stored `memory` and `user` targets using Hermes' `estimate_tokens_rough` helper.
