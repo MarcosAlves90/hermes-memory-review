@@ -1,11 +1,11 @@
-# Hermes Memory Review 1.5.4
+# Hermes Memory Review 1.5.5
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.5.4 provides a native **Memory Review** page in Hermes Desktop. After the
+Version 1.5.5 provides a native **Memory Review** page in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -24,6 +24,8 @@ is unavailable.
 **Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User**
 (`USER.md`) views. Every stored entry is listed and searchable. Select an entry,
 edit its complete text, and choose **Save changes** to replace that exact entry.
+Use **Add entry** to create a new entry in the active target. **Delete entry** uses
+a second **Confirm delete** click before removing the selected exact entry.
 The backend delegates the write to Hermes' own `MemoryStore`, so locking, limits,
 content scanning, drift detection, and atomic persistence remain enforced by
 Hermes. Both targets also show exact character usage against the active profile's
@@ -40,7 +42,10 @@ status, repeated qualifiers, and low-value nuance that would not change a future
 answer or action. The structured output schema also caps the proposal entry count
 based on the source size. A proposal must reduce the exact stored-memory character
 footprint by at least 25%; Hermes automatically retries once with a stricter budget
-when needed. While generation is running, Desktop shows an activity indicator and
+when needed. The plugin also validates the output entry count itself after the LLM
+returns: if a provider/model ignores the JSON Schema `maxItems`, the proposal is
+rejected and retried rather than shown with too many entries. A second violation
+fails closed without changing memory. While generation is running, Desktop shows an activity indicator and
 live elapsed time. The review panel is height-bounded with its own scrolling area,
 and reports before/after entry counts, percentage reduction, token estimate, and
 model attribution.
@@ -138,5 +143,5 @@ The equivalent native commands are:
 
 ## POLIS
 
-Version 1.5.4 is validated under a strict POLIS V6.10.0 contract,
+Version 1.5.5 is validated with POLIS V6.10.0 strict gates,
 complete tests, Cobertura coverage above 95%, and Hermes plugin validation.

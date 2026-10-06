@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.5 — 2026-10-06
+
+- Fixed AI compaction accepting proposals that exceeded the requested entry-count limit when Hermes/provider-side JSON Schema validation was unavailable or not enforced.
+- Added plugin-side entry-count validation: over-count proposals automatically retry once with the exact violation called out, then fail closed if the model still exceeds the limit.
+- Added **Add entry** for both `MEMORY.md` and `USER.md`, delegating validation and persistence to Hermes `MemoryStore.add`.
+- Added exact-entry deletion for both targets through `MemoryStore.remove`, with a two-step **Delete entry** / **Confirm delete** Desktop flow.
+- Added regression coverage for providers that ignore `maxItems`, add/delete success, stale/native-store failures, and the new Desktop controls.
+
 ## 1.5.4 — 2026-10-06
 
 - Fixed the AI compaction review layout so it is height-bounded, keeps its controls visible, scrolls proposed entries internally, and cannot cover the stored-memory editor below it.
