@@ -127,6 +127,16 @@ coverage above 95%, then runs the same `hermes plugins validate --install-deps`
 admission check used by the Hermes catalog. Test dependencies are isolated by
 `uv`; the installed plugin itself uses Hermes plus the Python standard library.
 
+## Catalog disclosures
+
+Magi reads the active Hermes profile's staged pending-memory records and the built-in `MEMORY.md` / `USER.md` stores in order to render its review and maintenance UI. The optional `home_override` setting can point Magi at another Hermes home/profile path selected by the user.
+
+Memory changes happen only after an explicit user action in Magi. Approve/reject operations and stored-memory add/edit/delete/compaction writes are delegated to Hermes' native memory APIs and safeguards rather than rewriting the built-in stores directly.
+
+Magi makes no direct third-party network requests, runs no shell commands or subprocesses at runtime, starts no long-running background process, and emits no telemetry or usage reporting. While the Desktop page is open it polls Magi's local profile-scoped backend every five seconds for UI freshness.
+
+AI compaction uses Hermes' `ctx.llm` surface with the user's active/default model. The selected memory content is therefore sent according to that Hermes provider configuration; Magi does not read, persist, refresh, or otherwise manage the provider credentials itself.
+
 ## Mutation paths
 
 For pending proposals, the backend reads JSON records under the active profile's
