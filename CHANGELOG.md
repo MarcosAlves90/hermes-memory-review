@@ -3,7 +3,9 @@
 ## 1.7.1 — 2026-10-06
 
 - Added catalog-ready compatibility metadata with `requires_hermes: ">=0.21.5"`.
-- Added and documented privacy-safe catalog screenshots plus the disclosures required by Hermes catalog rule 13.
+- Added and documented the disclosures required by Hermes catalog rule 13.
+- Added a clean screenshot captured from the real Magi Desktop UI for catalog
+  and pinned README rendering.
 
 ## 1.7.0 — 2026-10-06
 

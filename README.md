@@ -12,6 +12,8 @@ plugin is installed, enable both halves independently:
 2. Enable the Desktop **Magi** plugin in the same Plugins screen.
 3. Open **Magi** from the Desktop sidebar.
 
+![Magi pending-review dashboard](docs/screenshots/magi-dashboard.png)
+
 Use the compact workspace switch to alternate between **Pending writes** and
 **Stored memory**. The dashboard is organized around task state rather than raw
 records: queue/budget metrics stay visible, actions are contextual, search reports
@@ -174,5 +176,6 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.7.1 targets Hermes `>=0.21.5` and passes the repository verification suite: complete tests, Cobertura
+Version 1.7.1 targets Hermes `>=0.21.5` and passes the repository verification
+suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.
