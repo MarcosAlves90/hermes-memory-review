@@ -139,6 +139,13 @@ coverage above 95%, then runs the same `hermes plugins validate --install-deps`
 admission check used by the Hermes catalog. Test dependencies are isolated by
 `uv`; the installed plugin itself uses Hermes plus the Python standard library.
 
+POLIS workflow artifacts use repository retention through
+`.polis/artifact-retention.json`. Locked Change Contracts are therefore copied to
+`.polis/artifacts/contracts/` and can be resumed with `polis status` from the
+repository checkout. The retained contract introduced with this setup starts from
+its own locked baseline; it does not retroactively establish strict-development
+proof for Magi changes committed before that baseline.
+
 ## Catalog disclosures
 
 Magi reads the active Hermes profile's staged pending-memory records and the built-in `MEMORY.md` / `USER.md` stores in order to render its review and maintenance UI. The optional `home_override` setting can point Magi at another Hermes home/profile path selected by the user.
