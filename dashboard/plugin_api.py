@@ -417,7 +417,8 @@ def preview_memory_compaction(target: str) -> Dict[str, Any]:
         llm = _plugin_llm()
     except Exception as exc:
         return {"success": False, "error": f"AI compaction unavailable: {exc}"}
-    return build_memory_compaction_preview(llm, target, entries, _entry_delimiter())
+    model = str(_settings().get("compaction_model") or "").strip() or None
+    return build_memory_compaction_preview(llm, target, entries, _entry_delimiter(), model=model)
 
 
 @router.post("/memory/{target}/compact")

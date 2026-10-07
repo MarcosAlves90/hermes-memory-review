@@ -25,7 +25,9 @@ reduced-motion preferences disable transition motion.
 Pending writes open on a formatted **Overview** with proposal status, metadata,
 intent, and readable operation cards. **Proposal**, **Diff**, **Raw**, and **Verify**
 remain available for deeper inspection. Text in all five inspection views is
-selectable, so standard copy shortcuts work directly from the review pane. Queue
+selectable, so standard copy shortcuts work directly from the review pane. The
+inspection area can also be resized vertically from its lower edge/corner while
+keeping long content internally scrollable. Queue
 health shows total, ready, and attention-required proposals; obsolete/unverifiable
 items are visually distinct. Each pending write can be approved or rejected in place;
 **Approve all** and **Reject all** require an explicit confirmation click. It
@@ -40,7 +42,7 @@ the stale proposal through Hermes' native memory decision path.
 **Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User** (`USER.md`)
 views with entry count, character usage, estimated tokens, free capacity, and a live
 budget bar. Every stored entry is listed with its size and is searchable. Select an
-entry, edit its complete text, and choose **Save changes** to replace that exact entry;
+entry, edit its complete text in a vertically resizable editor, and choose **Save changes** to replace that exact entry;
 the editor distinguishes saved, unsaved, and externally stale states.
 Use **Add entry** to create a new entry in the active target. **Delete entry** uses
 a second **Confirm delete** click before removing the selected exact entry.
@@ -51,8 +53,11 @@ configured `memory_char_limit` / `user_char_limit`, plus the equivalent approxim
 token usage using Hermes' documented memory-budget scale of 2.75 chars/token. The
 percentage is based on the exact character limit that Hermes actually enforces.
 
-Choose **Compact with AI** on either target to ask Hermes' active/default model
-for a leaner representation. The model receives the current entries as one untrusted
+Choose **Compact with AI** on either target to ask the configured compaction model,
+or Hermes' active/default model when `compaction_model` is empty, for a leaner
+representation. An explicit model selection is still subject to Hermes' plugin LLM
+trust policy: `plugins.entries.magi.llm.allow_model_override` must be enabled and
+the model must satisfy any configured `allowed_models` restriction. The model receives the current entries as one untrusted
 memory corpus and is explicitly told not to preserve source entry boundaries. It
 extracts the durable, actionable core, merges related facts into a small number of
 thematic entries, and removes examples, explanations, narrative history, temporary
@@ -142,7 +147,10 @@ Memory changes happen only after an explicit user action in Magi. Approve/reject
 
 Magi makes no direct third-party network requests, runs no shell commands or subprocesses at runtime, starts no long-running background process, and emits no telemetry or usage reporting. While the Desktop page is open it polls Magi's local profile-scoped backend every five seconds for UI freshness.
 
-AI compaction uses Hermes' `ctx.llm` surface with the user's active/default model. The selected memory content is therefore sent according to that Hermes provider configuration; Magi does not read, persist, refresh, or otherwise manage the provider credentials itself.
+AI compaction uses Hermes' `ctx.llm` surface. The optional `compaction_model`
+setting selects a model through Hermes' trust-gated model override; when left empty,
+Hermes uses the user's active/default model. Provider selection and credentials stay
+owned by Hermes, and Magi does not read, persist, refresh, or otherwise manage them.
 
 ## Mutation paths
 
@@ -165,8 +173,10 @@ blocked replacement is rejected by Hermes instead of silently overwriting newer
 state.
 
 AI preview generation reuses the Agent plugin's bound context from the backend and
-calls `ctx.llm.complete_structured()` without a provider or model override, so Hermes
-keeps provider selection, credentials, fallback, and the active/default model.
+calls `ctx.llm.complete_structured()`. Magi passes the optional configured
+`compaction_model` as a model override while leaving provider selection untouched;
+an empty setting keeps Hermes' active/default model. Hermes enforces its plugin LLM
+override permission and allowlist before any explicit model can run.
 The preview carries a fingerprint of the exact source entries. The compact POST
 route rejects a stale fingerprint and delegates the complete consolidation to a
 single `MemoryStore.apply_batch()` transaction; failed validation leaves the

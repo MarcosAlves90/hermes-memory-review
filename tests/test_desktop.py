@@ -104,6 +104,23 @@ def test_pending_detail_text_is_selectable_for_copying():
     assert "'data-selectable-text': 'true'" in detail_source
 
 
+def test_entry_viewers_are_vertically_resizable():
+    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
+    pending_start = source.index("function PendingWritesPage")
+    pending_end = source.index("function StoredMemoryPage", pending_start)
+    pending_source = source[pending_start:pending_end]
+    stored_start = source.index("function StoredMemoryPage")
+    stored_end = source.index("function MagiPage", stored_start)
+    stored_source = source[stored_start:stored_end]
+
+    assert "RESIZABLE_ENTRY_VIEWER" in source
+    assert "resize-y" in source
+    assert "data-resizable-entry-viewer" in pending_source
+    assert pending_source.count("data-resizable-entry-viewer") >= 1
+    assert stored_source.count("data-resizable-entry-viewer") >= 2
+    assert "resize-none" not in stored_source
+
+
 def test_backend_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
     stage(
         tmp_path,
@@ -676,6 +693,27 @@ def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch
     assert "untrusted data" in call["system_prompt"].lower()
     assert "fewest coherent" in call["system_prompt"].lower()
     assert "preserve" in call["instructions"].lower()
+
+
+def test_backend_compaction_preview_uses_configured_model(monkeypatch):
+    api = load_api()
+    store = FakeMemoryStore(
+        memory=[
+            "The first durable fact is first fact with unnecessary explanatory wording.",
+            "The second durable fact is second fact with detail and repeated explanatory wording.",
+        ],
+    )
+    llm = FakeCompactionLlm(["first fact; second fact with detail"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    monkeypatch.setattr(api, "_plugin_llm", lambda: llm, raising=False)
+    monkeypatch.setattr(api, "_settings", lambda: {"compaction_model": "provider/compact-model"})
+
+    response = client_for(api).post("/memory/memory/compact/preview")
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+    assert llm.calls[0]["model"] == "provider/compact-model"
+    assert "provider" not in llm.calls[0]
 
 
 def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):

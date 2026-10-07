@@ -142,7 +142,13 @@ def _memory_compaction_instructions(
     )
 
 
-def build_memory_compaction_preview(llm: Any, target: str, entries: Sequence[str], delimiter: str) -> Dict[str, Any]:
+def build_memory_compaction_preview(
+    llm: Any,
+    target: str,
+    entries: Sequence[str],
+    delimiter: str,
+    model: Optional[str] = None,
+) -> Dict[str, Any]:
     if target not in {"memory", "user"}:
         return {"success": False, "error": "target must be 'memory' or 'user'."}
 
@@ -182,15 +188,20 @@ def build_memory_compaction_preview(llm: Any, target: str, entries: Sequence[str
             previous_status,
         )
         try:
+            completion_kwargs = {
+                "instructions": instructions,
+                "input": [{"type": "text", "text": attempt_text}],
+                "json_schema": schema,
+                "json_mode": True,
+                "schema_name": "memory_compaction_preview",
+                "system_prompt": MEMORY_COMPACTION_SYSTEM_PROMPT,
+                "temperature": 0,
+                "purpose": f"compact stored {target} memory",
+            }
+            if model:
+                completion_kwargs["model"] = model
             result = llm.complete_structured(
-                instructions=instructions,
-                input=[{"type": "text", "text": attempt_text}],
-                json_schema=schema,
-                json_mode=True,
-                schema_name="memory_compaction_preview",
-                system_prompt=MEMORY_COMPACTION_SYSTEM_PROMPT,
-                temperature=0,
-                purpose=f"compact stored {target} memory",
+                **completion_kwargs,
             )
         except Exception as exc:
             return {"success": False, "error": f"AI compaction failed: {exc}"}

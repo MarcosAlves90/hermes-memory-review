@@ -26,6 +26,7 @@ function formatCreated(value) {
 
 const CONTROL_TRANSITION = 'transition-all duration-100 ease-out motion-reduce:transition-none'
 const PANEL_TRANSITION = 'transition-[background-color,border-color,opacity] duration-150 ease-out motion-reduce:transition-none'
+const RESIZABLE_ENTRY_VIEWER = 'h-[48vh] min-h-40 max-h-[72vh] flex-none resize-y overflow-auto'
 
 function StatusDot({ tone = 'default' }) {
   const toneClass =
@@ -196,8 +197,10 @@ function OverviewView({ detail }) {
   const status = record.target_status || {}
 
   return jsxs('div', {
-    className: 'min-h-0 flex-1 overflow-auto p-4 animate-in fade-in-0 duration-150',
+    className: `${RESIZABLE_ENTRY_VIEWER} m-3 p-4 animate-in fade-in-0 duration-150`,
     'data-selectable-text': 'true',
+    'data-resizable-entry-viewer': 'true',
+    title: 'Drag the lower edge or corner to resize this entry viewer.',
     children: [
       jsxs('section', {
         className: 'mb-4 rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-4',
@@ -491,7 +494,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
             ]
           }),
           jsxs('main', {
-            className: 'flex min-h-0 min-w-0 flex-col',
+            className: 'flex min-h-0 min-w-0 flex-col overflow-auto',
             children: [
               currentId
                 ? jsxs('div', {
@@ -591,8 +594,10 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                     ? view === 'overview'
                       ? jsx(OverviewView, { detail: detail.data })
                       : jsx('pre', {
-                          className: 'm-3 min-h-0 flex-1 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-4 font-mono text-xs leading-relaxed animate-in fade-in-0 duration-150',
+                          className: `${RESIZABLE_ENTRY_VIEWER} m-3 whitespace-pre-wrap break-words rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-4 font-mono text-xs leading-relaxed animate-in fade-in-0 duration-150`,
                           'data-selectable-text': 'true',
+                          'data-resizable-entry-viewer': 'true',
+                          title: 'Drag the lower edge or corner to resize this entry viewer.',
                           children: detail.data[view] || ''
                         })
                     : jsx(EmptyState, {
@@ -1081,7 +1086,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
           }),
           adding
             ? jsxs('main', {
-                className: 'flex min-h-0 min-w-0 flex-col animate-in fade-in-0 duration-150',
+                className: 'flex min-h-0 min-w-0 flex-col overflow-auto animate-in fade-in-0 duration-150',
                 children: [
                   jsxs('div', {
                     className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-3',
@@ -1114,7 +1119,9 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
                     },
                     'aria-label': `Add ${target} memory entry`,
                     placeholder: 'Enter a durable memory entry…',
-                    className: 'm-3 min-h-0 flex-1 resize-none rounded-lg border border-(--ui-stroke-secondary) bg-transparent p-4 text-sm leading-relaxed outline-none transition-[border-color,background-color] duration-150 focus:border-(--ui-accent) focus:bg-(--chrome-action-hover)',
+                    className: `${RESIZABLE_ENTRY_VIEWER} m-3 rounded-lg border border-(--ui-stroke-secondary) bg-transparent p-4 text-sm leading-relaxed outline-none transition-[border-color,background-color] duration-150 focus:border-(--ui-accent) focus:bg-(--chrome-action-hover)`,
+                    'data-resizable-entry-viewer': 'true',
+                    title: 'Drag the lower edge or corner to resize this entry editor.',
                     spellCheck: false
                   }),
                   jsx('div', {
@@ -1129,7 +1136,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
               })
             : current
               ? jsxs('main', {
-                className: 'flex min-h-0 min-w-0 flex-col animate-in fade-in-0 duration-150',
+                className: 'flex min-h-0 min-w-0 flex-col overflow-auto animate-in fade-in-0 duration-150',
                 children: [
                   jsxs('div', {
                     className: 'flex flex-wrap items-center gap-2 border-b border-(--ui-stroke-secondary) px-4 py-3',
@@ -1168,7 +1175,9 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
                       setDeleteConfirm(false)
                     },
                     'aria-label': `Edit ${target} memory entry`,
-                    className: 'm-3 min-h-0 flex-1 resize-none rounded-lg border border-(--ui-stroke-secondary) bg-transparent p-4 text-sm leading-relaxed outline-none transition-[border-color,background-color] duration-150 focus:border-(--ui-accent) focus:bg-(--chrome-action-hover)',
+                    className: `${RESIZABLE_ENTRY_VIEWER} m-3 rounded-lg border border-(--ui-stroke-secondary) bg-transparent p-4 text-sm leading-relaxed outline-none transition-[border-color,background-color] duration-150 focus:border-(--ui-accent) focus:bg-(--chrome-action-hover)`,
+                    'data-resizable-entry-viewer': 'true',
+                    title: 'Drag the lower edge or corner to resize this entry editor.',
                     spellCheck: false
                   }),
                   current.stale

@@ -156,6 +156,29 @@ def test_compaction_preview_uses_default_llm_and_returns_reviewable_proposal(mon
     assert "do not" in call["instructions"].lower()
 
 
+def test_compaction_preview_uses_configured_model(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    llm = FakeLlm(["fact one; fact two detail"])
+    ctx = FakeCtx(
+        {"home_override": str(tmp_path), "compaction_model": "provider/compact-model"},
+        llm=llm,
+    )
+    store = FakePreviewStore(
+        memory=[
+            "The first durable fact is fact one and this sentence contains unnecessary explanation.",
+            "The second durable fact is fact two with detail and this sentence repeats unnecessary context.",
+        ]
+    )
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert llm.calls[0]["model"] == "provider/compact-model"
+    assert "provider" not in llm.calls[0]
+
+
 def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprint(monkeypatch, tmp_path):
     plugin = load_plugin()
     original = ["The user prefers concise answers.", "The user values precise technical detail."]

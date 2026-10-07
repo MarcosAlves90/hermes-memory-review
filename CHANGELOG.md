@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.7.5 — 2026-10-07
+
+- Made the entry-content viewer vertically resizable in both Pending writes and
+  Stored memory, with bounded default/minimum/maximum heights and internal
+  scrolling preserved.
+- Stored-memory add/edit textareas now use the same resize behavior as pending
+  Overview and technical inspection views, without changing backend contracts.
+
+## 1.7.4 — 2026-10-07
+
+- Added a `compaction_model` Magi setting for choosing the model used by AI
+  compaction previews; leaving it empty preserves Hermes' active/default model.
+- Routed the configured model through Hermes' supported `ctx.llm` facade for both
+  Agent commands and Desktop preview requests, while preserving Hermes'
+  `allow_model_override` and model-allowlist trust gates.
+- Added regression coverage for configured-model routing on both compaction entry
+  points.
+
 ## 1.7.3 — 2026-10-07
 
 - Made AI compaction more aggressive without lowering its semantic-safety bar:

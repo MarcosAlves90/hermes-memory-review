@@ -1,5 +1,5 @@
 name: magi
-version: 1.7.3
+version: 1.7.5
 manifest_version: 2
 api_version: 1
 requires_hermes: ">=0.21.5"
@@ -12,6 +12,11 @@ config_schema:
     default: ""
     label: "Hermes home override"
     description: "Optional absolute HERMES_HOME for unusual/custom profile layouts. Leave empty for automatic profile resolution."
+  compaction_model:
+    type: str
+    default: ""
+    label: "Compaction model"
+    description: "Optional Hermes model id for AI compaction. Leave empty to use the active/default model. Explicit overrides require Hermes plugins.entries.magi.llm.allow_model_override permission and any configured model allowlist."
   default_page_size:
     type: int
     default: 20

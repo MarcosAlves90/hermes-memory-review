@@ -103,7 +103,11 @@ def _compact_preview(ctx, raw_args: str) -> str:
         return json.dumps({"success": False, "error": "target must be 'memory' or 'user'."})
     store = _memory_store()
     entries = list(store.memory_entries if target == "memory" else store.user_entries)
-    result = build_memory_compaction_preview(ctx.llm, target, entries, _entry_delimiter())
+    try:
+        model = str(ctx.get_config("compaction_model", default="") or "").strip() or None
+    except Exception:
+        model = None
+    result = build_memory_compaction_preview(ctx.llm, target, entries, _entry_delimiter(), model=model)
     return json.dumps(result, ensure_ascii=False)
 
 
@@ -138,7 +142,7 @@ def register(ctx) -> None:
     ctx.register_command(
         "memory-compact-preview",
         handler=lambda raw: _compact_preview(ctx, raw),
-        description="Generate a reviewable AI compaction preview for stored Memory or User memory using the active/default model.",
+        description="Generate a reviewable AI compaction preview for stored Memory or User memory using the configured/default model.",
         args_hint="<memory|user>",
         argument_mode="text",
     )
