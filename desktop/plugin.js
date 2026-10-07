@@ -320,10 +320,10 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
     return jsxs('div', {
       className: 'flex h-full flex-col items-center justify-center gap-3 p-8 text-center',
       children: [
-        jsx('div', { className: 'text-base font-medium', children: 'Memory Review backend unavailable' }),
+        jsx('div', { className: 'text-base font-medium', children: 'Magi backend unavailable' }),
         jsx('div', {
           className: 'max-w-lg text-sm text-(--ui-text-tertiary)',
-          children: 'Enable the Agent half of memory-review for this profile, then retry.'
+          children: 'Enable the Agent half of Magi for this profile, then retry.'
         }),
         jsx('button', {
           type: 'button',
@@ -805,7 +805,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
         jsx('div', { className: 'text-base font-medium', children: 'Stored memory unavailable' }),
         jsx('div', {
           className: 'max-w-lg text-sm text-(--ui-text-tertiary)',
-          children: 'Enable the Agent half of memory-review for this profile, then retry.'
+          children: 'Enable the Agent half of Magi for this profile, then retry.'
         }),
         jsx('button', {
           type: 'button',
@@ -1190,7 +1190,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
   })
 }
 
-function MemoryReviewPage(props) {
+function MagiPage(props) {
   const [mode, setMode] = useState('pending')
   return jsxs('div', {
     className: 'flex h-full min-h-0 flex-col',
@@ -1206,7 +1206,7 @@ function MemoryReviewPage(props) {
             ]
           }),
           jsx('nav', {
-            'aria-label': 'Memory Review sections',
+            'aria-label': 'Magi sections',
             className: 'ml-auto flex gap-1 rounded-lg bg-(--chrome-action-hover) p-1',
             children: [
               ['pending', 'Pending writes', 'Review queue'],
@@ -1250,8 +1250,8 @@ function MemoryReviewPage(props) {
 }
 
 export default {
-  id: 'memory-review',
-  name: 'Memory Review',
+  id: 'magi',
+  name: 'Magi',
   description: 'Review pending Hermes memory proposals and inspect or edit stored memory.',
   defaultEnabled: false,
   register(ctx) {
@@ -1298,9 +1298,9 @@ export default {
       {
         id: 'page',
         area: ROUTES_AREA,
-        data: { path: '/memory-review' },
+        data: { path: '/magi' },
         render: () =>
-          jsx(MemoryReviewPage, {
+          jsx(MagiPage, {
             loadRecords,
             loadDetail,
             loadStoredMemory,
@@ -1317,7 +1317,7 @@ export default {
         id: 'nav',
         area: SIDEBAR_NAV_AREA,
         order: 55,
-        data: { path: '/memory-review', label: 'Memory Review', codicon: 'database' }
+        data: { path: '/magi', label: 'Magi', codicon: 'wand' }
       }
     ])
   }

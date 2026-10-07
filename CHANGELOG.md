@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.7.0 — 2026-10-06
+
+- Renamed the plugin end-to-end to **Magi**, including plugin/dashboard/Desktop IDs, route, slash command, CLI command, runtime bridge alias, tests, documentation, and repository URL.
+- Replaced the Hermes sidebar icon with the built-in `wand` Codicon.
+- Removed the previous branded slash/CLI aliases so Hermes configuration and navigation use one canonical plugin identity.
+
 ## 1.6.0 — 2026-10-06
 
 - Redesigned the Desktop dashboard around two clear workflows: reviewing pending proposals and maintaining stored memory, with stronger hierarchy, contextual actions, responsive layouts, and clearer empty/loading/error states.
@@ -98,7 +104,7 @@
 
 ## 1.2.0 — 2026-10-05
 
-- Added a native Hermes Desktop **Memory Review** page and sidebar entry.
+- Added a native Hermes Desktop **Magi** page and sidebar entry.
 - Added profile-scoped, read-only backend routes for pending record lists and complete Proposal/Diff/Raw/Verify views.
 - Added search, manual refresh, five-second polling fallback, empty/error states, and explicit backend-disabled guidance.
 - Kept all memory mutations in Hermes core; the plugin backend exposes GET routes only.
@@ -114,9 +120,9 @@
 
 ## 1.0.0 — 2026-10-05
 
-- `/memory-review` complete read-only inspector.
-- `/memory-show` and `/memreview` convenience aliases.
-- Terminal `hermes memory-review` surface.
+- `/magi` complete read-only inspector.
+- `/memory-show` convenience shortcut.
+- Terminal `hermes magi` surface.
 - Full payload rendering, unified diffs, search, stats and validation.
 - Exact/unique-prefix/oldest/newest selectors.
 - Pagination.

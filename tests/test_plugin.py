@@ -11,11 +11,11 @@ PLUGIN_DIR = ROOT
 
 
 def load_plugin():
-    name = "memory_review_plugin_test"
+    name = "magi_plugin_test"
     sys.modules.pop(name, None)
     sys.modules.pop(name + ".core", None)
     sys.modules.pop(name + ".runtime_bridge", None)
-    sys.modules.pop("_hermes_memory_review_runtime_bridge", None)
+    sys.modules.pop("_magi_runtime_bridge", None)
     spec = importlib.util.spec_from_file_location(
         name,
         PLUGIN_DIR / "__init__.py",
@@ -59,12 +59,12 @@ def test_registers_supported_commands(tmp_path):
     ctx = FakeCtx({"home_override": str(tmp_path), "default_page_size": 3, "max_page_size": 7})
     plugin.register(ctx)
 
-    assert set(ctx.commands) == {"memory-review", "memreview", "memory-show", "memory-compact-preview"}
-    assert set(ctx.cli_commands) == {"memory-review"}
-    assert ctx.commands["memory-review"]["argument_mode"] == "text"
+    assert set(ctx.commands) == {"magi", "memory-show", "memory-compact-preview"}
+    assert set(ctx.cli_commands) == {"magi"}
+    assert ctx.commands["magi"]["argument_mode"] == "text"
     assert "<id" in ctx.commands["memory-show"]["args_hint"]
     assert "memory|user" in ctx.commands["memory-compact-preview"]["args_hint"]
-    bridge = sys.modules["_hermes_memory_review_runtime_bridge"]
+    bridge = sys.modules["_magi_runtime_bridge"]
     assert bridge.get_plugin_llm() is ctx.llm
     assert len(ctx.unload_callbacks) == 1
     ctx.unload_callbacks[0]()
@@ -197,8 +197,8 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     original = [
         "User prefers concise answers and dislikes filler explanations.",
         "User prefers direct answers with minimal repetition.",
-        "User is building Hermes Memory Review.",
-        "Hermes Memory Review is a plugin for reviewing stored memory.",
+        "User is building Magi.",
+        "Magi is a plugin for reviewing stored memory.",
         "The plugin should keep memory actions explicit and reviewable.",
         "The plugin must not mutate stored memory before explicit apply.",
         "User values technical precision in implementation discussions.",
@@ -206,7 +206,7 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     ]
     compact = [
         "User prefers concise, direct, technically precise answers without filler or repetition.",
-        "Hermes Memory Review: keep memory changes explicit/reviewable; never mutate stored memory before Apply.",
+        "Magi: keep memory changes explicit/reviewable; never mutate stored memory before Apply.",
     ]
     llm = FakeLlm(compact)
     ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
@@ -300,11 +300,11 @@ def test_slash_and_shortcut_handlers(tmp_path):
     ctx = FakeCtx({"home_override": str(tmp_path)})
     plugin.register(ctx)
 
-    out = ctx.commands["memory-review"]["handler"]("list")
+    out = ctx.commands["magi"]["handler"]("list")
     assert "No pending memory writes" in out
 
     assert "Usage: /memory-show" in ctx.commands["memory-show"]["handler"]("")
-    assert "Invalid arguments" in ctx.commands["memory-review"]["handler"]('"unterminated')
+    assert "Invalid arguments" in ctx.commands["magi"]["handler"]('"unterminated')
     assert "Invalid arguments" in ctx.commands["memory-show"]["handler"]('"unterminated')
 
 
@@ -325,10 +325,10 @@ def test_setup_cli_and_cli_handler(tmp_path, capsys):
 
     import argparse
     parser = argparse.ArgumentParser()
-    setup = ctx.cli_commands["memory-review"]["setup_fn"]
+    setup = ctx.cli_commands["magi"]["setup_fn"]
     setup(parser)
     ns = parser.parse_args(["stats"])
-    handler = ctx.cli_commands["memory-review"]["handler_fn"]
+    handler = ctx.cli_commands["magi"]["handler_fn"]
     handler(ns)
     out = capsys.readouterr().out
     assert "Valid records: 0" in out

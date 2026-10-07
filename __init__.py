@@ -1,4 +1,4 @@
-"""Hermes Memory Review plugin.
+"""Magi plugin for Hermes.
 
 Pending-memory inspection stays read-only in this module. Stored-memory edits
 and compaction writes are delegated to Hermes MemoryStore safeguards.
@@ -13,7 +13,7 @@ from typing import List
 from .core import (
     MEMORY_CHARS_PER_TOKEN,
     TOKEN_ESTIMATE_METHOD,
-    MemoryReview,
+    MagiReview,
     build_memory_compaction_preview,
     estimate_memory_tokens,
     memory_source_fingerprint,
@@ -27,7 +27,7 @@ _MEMORY_CHARS_PER_TOKEN = MEMORY_CHARS_PER_TOKEN
 _TOKEN_ESTIMATE_METHOD = TOKEN_ESTIMATE_METHOD
 
 
-def _review(ctx) -> MemoryReview:
+def _review(ctx) -> MagiReview:
     override = ""
     default_page_size = 20
     max_page_size = 100
@@ -42,7 +42,7 @@ def _review(ctx) -> MemoryReview:
         profile_name=getattr(ctx, "profile_name", "default") or "default",
         override=override,
     )
-    return MemoryReview(
+    return MagiReview(
         home=home,
         default_page_size=max(1, default_page_size),
         max_page_size=max(1, max_page_size),
@@ -110,7 +110,7 @@ def _compact_preview(ctx, raw_args: str) -> str:
 
 def _setup_cli(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "memory_review_args",
+        "magi_args",
         nargs=argparse.REMAINDER,
         help="list|show|diff|raw|find|stats|verify|path ...",
     )
@@ -123,16 +123,9 @@ def register(ctx) -> None:
         on_unload(lambda: clear_plugin_context(ctx))
 
     ctx.register_command(
-        "memory-review",
+        "magi",
         handler=lambda raw: _slash(ctx, raw),
         description="Inspect pending Hermes memory writes in full (read-only).",
-        args_hint="[list|show|diff|raw|find|stats|verify|path] ...",
-        argument_mode="text",
-    )
-    ctx.register_command(
-        "memreview",
-        handler=lambda raw: _slash(ctx, raw),
-        description="Alias for /memory-review.",
         args_hint="[list|show|diff|raw|find|stats|verify|path] ...",
         argument_mode="text",
     )
@@ -152,11 +145,11 @@ def register(ctx) -> None:
     )
 
     def _cli_handler(ns) -> None:
-        args = list(getattr(ns, "memory_review_args", []) or [])
+        args = list(getattr(ns, "magi_args", []) or [])
         print(_dispatch(ctx, args))
 
     ctx.register_cli_command(
-        "memory-review",
+        "magi",
         help="Inspect pending memory writes (read-only)",
         setup_fn=_setup_cli,
         handler_fn=_cli_handler,

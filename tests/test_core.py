@@ -6,7 +6,7 @@ from pathlib import Path
 PLUGIN_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PLUGIN_DIR))
 
-from core import MemoryReview, resolve_hermes_home
+from core import MagiReview, resolve_hermes_home
 
 
 def stage(home: Path, pid: str, payload: dict, summary="summary", origin="foreground", created=1):
@@ -27,7 +27,7 @@ def stage(home: Path, pid: str, payload: dict, summary="summary", origin="foregr
 def test_show_preserves_long_content(tmp_path):
     content = "full " + ("x" * 500)
     stage(tmp_path, "abcd1234", {"action": "add", "target": "memory", "content": content})
-    out = MemoryReview(tmp_path).show("abcd")
+    out = MagiReview(tmp_path).show("abcd")
     assert content in out
     assert "Pending memory write abcd1234" in out
 
@@ -35,8 +35,8 @@ def test_show_preserves_long_content(tmp_path):
 def test_unique_prefix_and_ambiguous_prefix(tmp_path):
     stage(tmp_path, "abcd1111", {"action": "add", "target": "memory", "content": "one"})
     stage(tmp_path, "abce2222", {"action": "add", "target": "memory", "content": "two"}, created=2)
-    assert "one" in MemoryReview(tmp_path).show("abcd")
-    assert "Ambiguous" in MemoryReview(tmp_path).show("abc")
+    assert "one" in MagiReview(tmp_path).show("abcd")
+    assert "Ambiguous" in MagiReview(tmp_path).show("abc")
 
 
 def test_diff_replace_uses_pinned_entry(tmp_path):
@@ -47,7 +47,7 @@ def test_diff_replace_uses_pinned_entry(tmp_path):
         "matched_entry": "old whole entry\n",
         "content": "new whole entry\n",
     })
-    out = MemoryReview(tmp_path).diff("r1")
+    out = MagiReview(tmp_path).diff("r1")
     assert "old whole entry" in out
     assert "new whole entry" in out
     assert "--- operation:before" in out
@@ -60,7 +60,7 @@ def test_verify_warns_unpinned_remove(tmp_path):
         "target": "memory",
         "old_text": "legacy target",
     })
-    out = MemoryReview(tmp_path).verify("rm1")
+    out = MagiReview(tmp_path).verify("rm1")
     assert "WARN" in out
     assert "matched_entry" in out
 
@@ -71,41 +71,41 @@ def test_control_sequences_are_escaped(tmp_path):
         "target": "memory",
         "content": "hello\x1b[31mred",
     })
-    out = MemoryReview(tmp_path).show("esc1")
+    out = MagiReview(tmp_path).show("esc1")
     assert "\x1b" not in out
     assert "\\u001b" in out
 
 
 def test_find_searches_payload(tmp_path):
     stage(tmp_path, "f1", {"action": "add", "target": "user", "content": "favorite editor is neovim"})
-    assert "f1" in MemoryReview(tmp_path).find("neovim")
+    assert "f1" in MagiReview(tmp_path).find("neovim")
 
 
 def test_oldest_newest(tmp_path):
     stage(tmp_path, "old", {"action": "add", "target": "memory", "content": "first"}, created=1)
     stage(tmp_path, "new", {"action": "add", "target": "memory", "content": "second"}, created=2)
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     assert "first" in r.show("oldest")
     assert "second" in r.show("newest")
 
 
 def test_path_traversal_selector_cannot_escape(tmp_path):
     stage(tmp_path, "safe", {"action": "add", "target": "memory", "content": "ok"})
-    out = MemoryReview(tmp_path).show("../../etc/passwd")
+    out = MagiReview(tmp_path).show("../../etc/passwd")
     assert "No pending memory write" in out
 
 
 def test_list_paginates(tmp_path):
     for i in range(5):
         stage(tmp_path, f"id{i}", {"action": "add", "target": "memory", "content": str(i)}, created=i)
-    out = MemoryReview(tmp_path, default_page_size=2).list_records(2, 2)
+    out = MagiReview(tmp_path, default_page_size=2).list_records(2, 2)
     assert "page 2/3" in out
     assert "id2" in out and "id3" in out
     assert "id0" not in out
 
 
 def test_empty_store_surfaces_useful_messages(tmp_path):
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     assert "No pending memory writes" in r.list_records()
     assert "No pending memory writes" in r.show("newest")
     assert "No pending memory writes" in r.verify("newest")
@@ -117,7 +117,7 @@ def test_malformed_files_are_reported(tmp_path):
     d.mkdir(parents=True)
     (d / "array.json").write_text("[]", encoding="utf-8")
     (d / "broken.json").write_text("{", encoding="utf-8")
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     assert "Skipped malformed files: 2" in r.list_records()
     out = r.verify("all")
     assert "array.json" in out
@@ -135,7 +135,7 @@ def test_batch_validation_and_diff(tmp_path):
             {"action": "remove", "old_text": "delete", "matched_entry": "delete entry\n"},
         ],
     })
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     out = r.verify("batch1")
     assert "OK batch1" in out
     diff = r.diff("batch1")
@@ -159,7 +159,7 @@ def test_invalid_payloads_report_errors_and_warnings(tmp_path):
     for name, data in records.items():
         (d / f"{name}.json").write_text(json.dumps(data), encoding="utf-8")
 
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     all_out = r.verify("all")
     assert "payload is missing or is not an object" in all_out
     assert "expected 'memory'" in all_out
@@ -175,7 +175,7 @@ def test_invalid_payloads_report_errors_and_warnings(tmp_path):
 
 def test_show_surfaces_validation_diagnostics(tmp_path):
     stage(tmp_path, "badadd", {"action": "add", "target": "wrong", "content": ""})
-    out = MemoryReview(tmp_path).show("badadd")
+    out = MagiReview(tmp_path).show("badadd")
     assert "Validation:" in out
     assert "ERROR:" in out
 
@@ -183,7 +183,7 @@ def test_show_surfaces_validation_diagnostics(tmp_path):
 def test_raw_path_stats_and_find_edge_cases(tmp_path):
     stage(tmp_path, "s1", {"action": "add", "target": "memory", "content": "alpha"}, summary="alpha", origin="background_review")
     stage(tmp_path, "s2", {"action": "remove", "target": "user", "old_text": "beta", "matched_entry": "beta"}, summary="beta", created=2)
-    r = MemoryReview(tmp_path, max_page_size=1)
+    r = MagiReview(tmp_path, max_page_size=1)
 
     assert '"id": "s1"' in r.raw("s1")
     assert r.path("s1").endswith("s1.json")
@@ -197,7 +197,7 @@ def test_raw_path_stats_and_find_edge_cases(tmp_path):
 
 def test_list_handles_auto_empty_page_and_limits(tmp_path):
     stage(tmp_path, "l1", {"action": "add", "target": "memory", "content": "x"}, origin="background_review")
-    r = MemoryReview(tmp_path, default_page_size=1, max_page_size=2)
+    r = MagiReview(tmp_path, default_page_size=1, max_page_size=2)
     out = r.list_records(1, 999)
     assert "[auto]" in out
     assert "page 1/1" in out
@@ -209,17 +209,17 @@ def test_noop_diff_and_unknown_action(tmp_path):
         "action": "replace", "target": "memory",
         "old_text": "same", "matched_entry": "same", "content": "same"
     })
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     assert "(no textual difference)" in r.diff("same")
     assert "Unsupported/unknown action" in r._op_diff("x", {"action": "mystery"})
 
 
 def test_dispatch_all_branches(tmp_path):
     stage(tmp_path, "d1", {"action": "add", "target": "memory", "content": "needle"})
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
 
-    assert "Hermes Memory Review" in r.dispatch([])
-    assert "Hermes Memory Review" in r.dispatch(["--help"])
+    assert "Magi" in r.dispatch([])
+    assert "Magi" in r.dispatch(["--help"])
     assert "Pending memory writes" in r.dispatch(["list"])
     assert "Usage: list" in r.dispatch(["list", "bad"])
     assert "Usage: show" in r.dispatch(["show"])
@@ -249,7 +249,7 @@ def test_created_at_and_time_fallbacks(tmp_path):
         "payload": {"action": "add", "target": "memory", "content": "x"},
     }
     (d / "time1.json").write_text(json.dumps(data), encoding="utf-8")
-    r = MemoryReview(tmp_path)
+    r = MagiReview(tmp_path)
     out = r.show("time1")
     assert "Created: unknown" in out
 

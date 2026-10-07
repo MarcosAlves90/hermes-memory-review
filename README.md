@@ -1,16 +1,16 @@
-# Hermes Memory Review 1.6.0
+# Magi 1.7.0
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.6.0 provides a native **Memory Review** workspace in Hermes Desktop. After the
+Version 1.7.0 provides a native **Magi** workspace in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
-2. Enable the Desktop **Memory Review** plugin in the same Plugins screen.
-3. Open **Memory Review** from the Desktop sidebar.
+2. Enable the Desktop **Magi** plugin in the same Plugins screen.
+3. Open **Magi** from the Desktop sidebar.
 
 Use the compact workspace switch to alternate between **Pending writes** and
 **Stored memory**. The dashboard is organized around task state rather than raw
@@ -80,27 +80,26 @@ atomic `MemoryStore.apply_batch()` update.
 Session:
 
 ```text
-/memory-review list [page] [limit]
-/memory-review show <id|prefix|oldest|newest>
-/memory-review diff <id|prefix|oldest|newest>
-/memory-review raw <id|prefix|oldest|newest>
-/memory-review find <text>
-/memory-review stats
-/memory-review verify [id|all]
-/memory-review path <id|prefix>
+/magi list [page] [limit]
+/magi show <id|prefix|oldest|newest>
+/magi diff <id|prefix|oldest|newest>
+/magi raw <id|prefix|oldest|newest>
+/magi find <text>
+/magi stats
+/magi verify [id|all]
+/magi path <id|prefix>
 /memory-show <id|prefix>
 /memory-compact-preview <memory|user>
-/memreview ...
 ```
 
 Terminal:
 
 ```bash
-hermes memory-review list
-hermes memory-review show newest
-hermes memory-review diff <id> | less
-hermes memory-review raw <id> | less
-hermes memory-review verify all
+hermes magi list
+hermes magi show newest
+hermes magi diff <id> | less
+hermes magi raw <id> | less
+hermes magi verify all
 ```
 
 Use the terminal form for very large payloads because messaging platforms may
@@ -109,8 +108,8 @@ impose their own message limits.
 ## Install
 
 ```bash
-hermes plugins install https://github.com/MarcosAlves90/hermes-memory-review
-hermes plugins enable memory-review
+hermes plugins install https://github.com/MarcosAlves90/magi
+hermes plugins enable magi
 ```
 
 For Desktop, use **Capabilities → Plugins → Rescan** if the app was already
@@ -165,5 +164,5 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.6.0 passes the repository verification suite: complete tests, Cobertura
+Version 1.7.0 passes the repository verification suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.

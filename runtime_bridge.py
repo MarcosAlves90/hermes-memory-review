@@ -13,7 +13,7 @@ import sys
 from typing import Any
 
 
-RUNTIME_BRIDGE_ALIAS = "_hermes_memory_review_runtime_bridge"
+RUNTIME_BRIDGE_ALIAS = "_magi_runtime_bridge"
 _plugin_context: Any = None
 
 # dashboard/plugin_api.py is imported under a different synthetic package name.
@@ -36,6 +36,6 @@ def clear_plugin_context(ctx: Any = None) -> None:
 def get_plugin_llm() -> Any:
     if _plugin_context is None:
         raise RuntimeError(
-            "Hermes Memory Review Agent context is unavailable; enable the Agent plugin for this profile."
+            "Magi Agent context is unavailable; enable the Agent plugin for this profile."
         )
     return _plugin_context.llm

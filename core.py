@@ -345,7 +345,7 @@ class Record:
             return 0.0
 
 
-class MemoryReview:
+class MagiReview:
     def __init__(self, home: Path, default_page_size: int = 20, max_page_size: int = 100):
         self.home = Path(home)
         self.pending_dir = self.home / "pending" / "memory"
@@ -511,26 +511,25 @@ class MemoryReview:
 
     def help(self) -> str:
         return """\
-Hermes Memory Review — read-only pending-memory inspector
+Magi — read-only pending-memory inspector
 
 Session commands:
-  /memory-review list [page] [limit]      List pending writes (default)
-  /memory-review show <id|prefix>         Full human-readable proposal
-  /memory-review diff <id|prefix>         Before/after unified diff
-  /memory-review raw <id|prefix>          Full sanitized JSON record
-  /memory-review find <text>              Search summary + payload
-  /memory-review stats                    Counts by action/target/origin
-  /memory-review verify [id|all]          Structural/safety checks
-  /memory-review path <id|prefix>         Show backing JSON path
+  /magi list [page] [limit]               List pending writes (default)
+  /magi show <id|prefix>                  Full human-readable proposal
+  /magi diff <id|prefix>                  Before/after unified diff
+  /magi raw <id|prefix>                   Full sanitized JSON record
+  /magi find <text>                       Search summary + payload
+  /magi stats                             Counts by action/target/origin
+  /magi verify [id|all]                   Structural/safety checks
+  /magi path <id|prefix>                  Show backing JSON path
   /memory-show <id|prefix>                Shortcut for show
-  /memreview ...                          Alias
 
 Selectors:
   exact id, unique id prefix, oldest, newest
 
 Terminal:
-  hermes memory-review <same subcommands>
-  Example: hermes memory-review raw newest | less
+  hermes magi <same subcommands>
+  Example: hermes magi raw newest | less
 
 These inspector commands never approve/reject/change memory. The Desktop page
 delegates decisions to Hermes native commands:
@@ -565,9 +564,9 @@ delegates decisions to Hermes native commands:
             lines.append(f"\nSkipped malformed files: {len(issues)} (run `verify all` for details)")
         lines += [
             "",
-            "Full proposal: /memory-review show <id>",
-            "Diff:          /memory-review diff <id>",
-            "Raw JSON:      /memory-review raw <id>",
+            "Full proposal: /magi show <id>",
+            "Diff:          /magi diff <id>",
+            "Raw JSON:      /magi raw <id>",
         ]
         return "\n".join(lines)
 

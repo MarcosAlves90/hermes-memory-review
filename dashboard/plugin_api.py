@@ -1,6 +1,6 @@
-"""Structured backend for Hermes Memory Review.
+"""Structured backend for Magi.
 
-Hermes mounts this router below ``/api/plugins/memory-review`` and scopes the
+Hermes mounts this router below ``/api/plugins/magi`` and scopes the
 request to the active profile. Pending-write decisions replay Hermes' native
 staged-memory semantics directly in the plugin backend, so they are independent
 of chat sessions. Stored-memory edits delegate persistence to Hermes' own
@@ -19,10 +19,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 
-_PLUGIN_ID = "memory-review"
+_PLUGIN_ID = "magi"
 _PLUGIN_ROOT = Path(__file__).resolve().parents[1]
 _core = runpy.run_path(str(_PLUGIN_ROOT / "core.py"))
-MemoryReview = _core["MemoryReview"]
+MagiReview = _core["MagiReview"]
 resolve_hermes_home = _core["resolve_hermes_home"]
 build_memory_compaction_preview = _core["build_memory_compaction_preview"]
 memory_source_fingerprint = _core["memory_source_fingerprint"]
@@ -31,7 +31,7 @@ router = APIRouter()
 
 _MEMORY_CHARS_PER_TOKEN = 2.75
 _TOKEN_ESTIMATE_METHOD = "hermes_memory_budget_2.75_chars_per_token"
-_RUNTIME_BRIDGE_ALIAS = "_hermes_memory_review_runtime_bridge"
+_RUNTIME_BRIDGE_ALIAS = "_magi_runtime_bridge"
 
 
 class MemoryEditRequest(BaseModel):
@@ -82,7 +82,7 @@ def _review() -> Any:
         profile_name="default",
         override=str(settings.get("home_override") or ""),
     )
-    return MemoryReview(
+    return MagiReview(
         home=home,
         default_page_size=max(1, int(settings.get("default_page_size") or 20)),
         max_page_size=max(1, int(settings.get("max_page_size") or 100)),
@@ -135,7 +135,7 @@ def _plugin_llm() -> Any:
     bridge = sys.modules.get(_RUNTIME_BRIDGE_ALIAS)
     if bridge is None:
         raise RuntimeError(
-            "Hermes Memory Review Agent context is unavailable; enable the Agent plugin for this profile."
+            "Magi Agent context is unavailable; enable the Agent plugin for this profile."
         )
     return bridge.get_plugin_llm()
 

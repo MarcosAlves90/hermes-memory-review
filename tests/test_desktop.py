@@ -32,11 +32,11 @@ def load_api():
     manifest_path = DASHBOARD / "manifest.json"
     assert manifest_path.is_file(), "desktop plugin manifest is required"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    assert manifest == {"name": "memory-review", "api": "plugin_api.py"}
+    assert manifest == {"name": "magi", "api": "plugin_api.py"}
 
     api_path = DASHBOARD / manifest["api"]
     assert api_path.is_file()
-    name = "memory_review_dashboard_test"
+    name = "magi_dashboard_test"
     sys.modules.pop(name, None)
     spec = importlib.util.spec_from_file_location(name, api_path)
     module = importlib.util.module_from_spec(spec)
@@ -58,7 +58,11 @@ def test_unified_desktop_package_uses_documented_surfaces():
     assert "@hermes/plugin-sdk" in source
     assert "ROUTES_AREA" in source
     assert "SIDEBAR_NAV_AREA" in source
-    assert "data: { path: '/memory-review'" in source
+    assert "id: 'magi'" in source
+    assert "name: 'Magi'" in source
+    assert "data: { path: '/magi'" in source
+    assert "label: 'Magi'" in source
+    assert "codicon: 'wand'" in source
     assert "ctx.rest('/records')" in source
     assert "ctx.rest('/memory')" in source
     assert "method: 'PUT'" in source
@@ -522,7 +526,7 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "setInterval" in source
     assert "automatically retry" in source
     stored_start = source.index("function StoredMemoryPage")
-    stored_end = source.index("function MemoryReviewPage", stored_start)
+    stored_end = source.index("function MagiPage", stored_start)
     stored_source = source[stored_start:stored_end]
     assert "max-h-[44vh]" in stored_source
     assert "shrink-0" in stored_source
