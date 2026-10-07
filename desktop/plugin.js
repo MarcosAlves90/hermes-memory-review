@@ -763,6 +763,13 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
     setFeedback(null)
     try {
       const preview = await requestCompaction(target)
+      if (preview?.outcome === 'no_change') {
+        setFeedback({
+          kind: 'info',
+          message: [preview.message, preview.reason ? `AI assessment: ${preview.reason}` : null].filter(Boolean).join(' ')
+        })
+        return
+      }
       setCompactionPreview(preview)
     } catch (error) {
       setFeedback({
@@ -934,7 +941,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
               }),
               jsx('div', {
                 className: 'mt-2 text-xs text-(--ui-text-tertiary)',
-                children: 'Hermes is generating and validating a smaller proposal; if needed, it will automatically retry with a stricter compression budget.'
+                children: 'Hermes is generating and validating a smaller proposal; if needed, it will automatically retry with progressively stricter wording and a final semantic-limit check.'
               })
             ]
           })

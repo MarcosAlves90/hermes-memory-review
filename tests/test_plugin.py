@@ -83,9 +83,14 @@ class FakeLlm:
 
     def complete_structured(self, **kwargs):
         self.calls.append(kwargs)
+        payload = self.entries if isinstance(self.entries, dict) else {
+            "status": "compacted",
+            "reason": "",
+            "entries": self.entries,
+        }
         return SimpleNamespace(
-            parsed={"entries": self.entries},
-            text=json.dumps({"entries": self.entries}),
+            parsed=payload,
+            text=json.dumps(payload),
             provider="default-provider",
             model="default-model",
         )
@@ -98,10 +103,15 @@ class FakeSequenceLlm:
 
     def complete_structured(self, **kwargs):
         self.calls.append(kwargs)
-        entries = self.responses[len(self.calls) - 1]
+        response = self.responses[len(self.calls) - 1]
+        payload = response if isinstance(response, dict) else {
+            "status": "compacted",
+            "reason": "",
+            "entries": response,
+        }
         return SimpleNamespace(
-            parsed={"entries": entries},
-            text=json.dumps({"entries": entries}),
+            parsed=payload,
+            text=json.dumps(payload),
             provider="default-provider",
             model="default-model",
         )
@@ -227,6 +237,8 @@ def test_compaction_preview_targets_core_memory_and_fewer_entries(monkeypatch, t
     assert "source entry boundaries have no semantic value" in system_prompt
     assert "smallest durable representation" in system_prompt
     assert "examples" in system_prompt
+    assert "compact fragments" in system_prompt
+    assert "repeated subject wrappers" in system_prompt
     assert "at most 2 entries" in instructions
 
 
@@ -266,7 +278,7 @@ def test_compaction_preview_fails_closed_when_model_keeps_ignoring_entry_limit(m
         for index in range(1, 9)
     ]
     too_many = ["a", "b", "c", "d", "e", "f", "g", "h"]
-    llm = FakeSequenceLlm([too_many, too_many])
+    llm = FakeSequenceLlm([too_many, too_many, too_many])
     ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
     store = FakePreviewStore(memory=original)
     monkeypatch.setattr(plugin, "_memory_store", lambda: store)
@@ -277,7 +289,72 @@ def test_compaction_preview_fails_closed_when_model_keeps_ignoring_entry_limit(m
     assert result["success"] is False
     assert result["after_entry_count"] == 8
     assert "maximum of 2 entries" in result["error"]
+    assert len(llm.calls) == 3
+
+
+def test_compaction_preview_challenges_early_cannot_compact_claim(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = ["A" * 100, "B" * 100, "C" * 100, "D" * 100]
+    llm = FakeSequenceLlm(
+        [
+            {
+                "status": "cannot_compact_further",
+                "reason": "I would have to drop a durable fact.",
+                "entries": ["X" * 250],
+            },
+            ["Y" * 170],
+        ]
+    )
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["outcome"] == "proposal"
+    assert result["attempts"] == 2
+    assert result["after_chars"] == 170
     assert len(llm.calls) == 2
+    retry = llm.calls[1]["instructions"].lower()
+    assert "claimed that further compaction was unsafe" in retry
+    assert "challenge that claim" in retry
+
+
+def test_compaction_preview_reports_no_change_when_final_pass_declares_limit(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    original = ["A" * 100, "B" * 100, "C" * 100, "D" * 100]
+    llm = FakeSequenceLlm(
+        [
+            ["X" * 250],
+            ["Y" * 210],
+            {
+                "status": "cannot_compact_further",
+                "reason": "Every remaining clause is a distinct durable constraint; removing one changes future behavior.",
+                "entries": ["Z" * 200],
+            },
+        ]
+    )
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=original)
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is True
+    assert result["outcome"] == "no_change"
+    assert result["attempts"] == 3
+    assert result["before_chars"] > result["best_candidate_chars"]
+    assert result["required_chars"] < result["best_candidate_chars"]
+    assert "could not safely compress" in result["message"].lower()
+    assert "memory was not changed" in result["message"].lower()
+    assert "distinct durable constraint" in result["reason"].lower()
+    assert len(llm.calls) == 3
+    final_prompt = llm.calls[2]["instructions"].lower()
+    assert "only on this final pass" in final_prompt
+    assert "cannot_compact_further" in final_prompt
 
 
 def test_compaction_preview_rejects_invalid_or_empty_target_without_llm(monkeypatch, tmp_path):

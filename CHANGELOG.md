@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.7.3 — 2026-10-07
+
+- Made AI compaction more aggressive without lowering its semantic-safety bar:
+  three passes now progressively remove prose scaffolding, repeated subject
+  wrappers, inferable consequences, and other lexical overhead while keeping the
+  final 55% minimum-reduction acceptance threshold.
+- Added an explicit structured `cannot_compact_further` signal. Magi challenges
+  early claims, accepts the signal only on the final pass, and then reports a
+  non-error "no change" result with the model's reason instead of presenting a
+  failed budget check as an unexplained compaction error.
+- Retry passes now keep working from the shortest candidate seen so far rather
+  than allowing a later, more verbose proposal to become the new baseline.
+
 ## 1.7.2 — 2026-10-07
 
 - Fixed multi-profile Desktop requests so pending-memory review resolves the

@@ -614,6 +614,8 @@ def test_desktop_stored_memory_mode_exposes_both_targets_and_editing():
     assert "overflow-hidden" in stored_source
     assert "before_entry_count" in stored_source
     assert "reduction_percent" in stored_source
+    assert "preview?.outcome === 'no_change'" in stored_source
+    assert "kind: 'info'" in stored_source
     assert "Apply compaction" in source
     assert "Cancel preview" in source
     preview_start = source.index("const requestCompaction")

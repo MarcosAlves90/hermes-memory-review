@@ -42,5 +42,5 @@
 <line x1="638" y1="742" x2="1384" y2="742" stroke="#343945"/>
 <rect x="1150" y="765" width="96" height="38" rx="8" fill="#303746" stroke="#50617a"/><text x="1198" y="789" text-anchor="middle" fill="#eef2ff" font-family="Inter,Arial,sans-serif" font-size="13">Reject</text>
 <rect x="1256" y="765" width="104" height="38" rx="8" fill="#33456c" stroke="#637bd3"/><text x="1308" y="789" text-anchor="middle" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="13">Approve</text>
-<text x="1356" y="852" fill="#666d7b" font-family="Inter,Arial,sans-serif" font-size="12" text-anchor="end">Magi 1.7.2 · Hermes Desktop</text>
+<text x="1356" y="852" fill="#666d7b" font-family="Inter,Arial,sans-serif" font-size="12" text-anchor="end">Magi 1.7.3 · Hermes Desktop</text>
 </svg>
