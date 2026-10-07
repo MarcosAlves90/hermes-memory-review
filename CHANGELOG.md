@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.7.1 — 2026-10-06
+
+- Added catalog-ready compatibility metadata with `requires_hermes: ">=0.21.5"`.
+- Added and documented privacy-safe catalog screenshots plus the disclosures required by Hermes catalog rule 13.
+
 ## 1.7.0 — 2026-10-06
 
 - Renamed the plugin end-to-end to **Magi**, including plugin/dashboard/Desktop IDs, route, slash command, CLI command, runtime bridge alias, tests, documentation, and repository URL.
