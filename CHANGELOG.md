@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.7.2 — 2026-10-07
+
+- Fixed multi-profile Desktop requests so pending-memory review resolves the
+  same request-scoped Hermes home as the native MemoryStore via
+  `hermes_constants.get_hermes_home()`.
+- Added regression coverage proving a context-local profile override lists,
+  approves, and rejects only that profile's staged memory records even when
+  process-level `HERMES_HOME` points elsewhere.
+
 ## 1.7.1 — 2026-10-06
 
 - Added catalog-ready compatibility metadata with `requires_hermes: ">=0.21.5"`.

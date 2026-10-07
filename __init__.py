@@ -39,7 +39,6 @@ def _review(ctx) -> MagiReview:
         pass
 
     home = resolve_hermes_home(
-        profile_name=getattr(ctx, "profile_name", "default") or "default",
         override=override,
     )
     return MagiReview(

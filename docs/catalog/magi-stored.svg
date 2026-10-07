@@ -49,5 +49,5 @@
 <text x="694" y="746" fill="#fff" font-family="Inter,Arial,sans-serif" font-size="14" font-weight="600">AI compaction preview</text>
 <text x="694" y="772" fill="#8d94a3" font-family="Inter,Arial,sans-serif" font-size="12">12 → 5 entries · 8,420 → 4,103 chars · 51% reduction</text>
 <rect x="1202" y="742" width="158" height="38" rx="8" fill="#303746" stroke="#50617a"/><text x="1281" y="766" text-anchor="middle" fill="#eef2ff" font-family="Inter,Arial,sans-serif" font-size="12">Compact with AI</text>
-<text x="1356" y="852" fill="#666d7b" font-family="Inter,Arial,sans-serif" font-size="12" text-anchor="end">Magi 1.7.1 · Hermes Desktop</text>
+<text x="1356" y="852" fill="#666d7b" font-family="Inter,Arial,sans-serif" font-size="12" text-anchor="end">Magi 1.7.2 · Hermes Desktop</text>
 </svg>

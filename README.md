@@ -1,11 +1,11 @@
-# Magi 1.7.1
+# Magi 1.7.2
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.7.1 provides a native **Magi** workspace in Hermes Desktop. After the
+Version 1.7.2 provides a native **Magi** workspace in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -176,6 +176,6 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.7.1 targets Hermes `>=0.21.5` and passes the repository verification
+Version 1.7.2 targets Hermes `>=0.21.5` and passes the repository verification
 suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.

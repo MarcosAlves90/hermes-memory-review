@@ -79,7 +79,6 @@ def _settings() -> Dict[str, Any]:
 def _review() -> Any:
     settings = _settings()
     home = resolve_hermes_home(
-        profile_name="default",
         override=str(settings.get("home_override") or ""),
     )
     return MagiReview(

@@ -254,19 +254,16 @@ def test_created_at_and_time_fallbacks(tmp_path):
     assert "Created: unknown" in out
 
 
-def test_resolve_hermes_home(monkeypatch, tmp_path):
+def test_resolve_hermes_home(monkeypatch, tmp_path, hermes_home_context):
     override = tmp_path / "override"
     assert resolve_hermes_home(profile_name="default", override=str(override)) == override.resolve()
 
-    env_home = tmp_path / "envhome"
-    monkeypatch.setenv("HERMES_HOME", str(env_home))
-    assert resolve_hermes_home(profile_name="default") == env_home.resolve()
-
-    named = tmp_path / "named"
-    monkeypatch.setenv("HERMES_HOME", str(named))
-    assert resolve_hermes_home(profile_name="named") == named.resolve()
-
-    monkeypatch.delenv("HERMES_HOME", raising=False)
-    monkeypatch.setattr(Path, "home", classmethod(lambda cls: tmp_path))
-    assert resolve_hermes_home(profile_name="default") == (tmp_path / ".hermes").resolve()
-    assert resolve_hermes_home(profile_name="work") == (tmp_path / ".hermes" / "profiles" / "work").resolve()
+    process_home = tmp_path / "process"
+    request_home = tmp_path / "request"
+    monkeypatch.setenv("HERMES_HOME", str(process_home))
+    token = hermes_home_context.set_hermes_home_override(request_home)
+    try:
+        assert resolve_hermes_home(profile_name="default") == request_home.resolve()
+        assert resolve_hermes_home(profile_name="work") == request_home.resolve()
+    finally:
+        hermes_home_context.reset_hermes_home_override(token)

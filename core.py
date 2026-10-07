@@ -3,7 +3,6 @@ from __future__ import annotations
 import difflib
 import hashlib
 import json
-import os
 import shlex
 from dataclasses import dataclass
 from datetime import datetime
@@ -246,30 +245,19 @@ def tokenize(raw: str) -> List[str]:
 
 
 def resolve_hermes_home(profile_name: str = "default", override: str = "") -> Path:
-    """Resolve the active profile without importing Hermes private modules.
+    """Resolve the active Hermes home, preserving an explicit plugin override.
 
-    The documented standard layout is:
-      default: ~/.hermes
-      named:   ~/.hermes/profiles/<name>
-
-    HERMES_HOME wins for the default profile, and for a named profile when its
-    basename matches the active profile. `home_override` handles nonstandard
-    multiplex/custom layouts explicitly.
+    Hermes owns platform defaults, data-directory suffixes, and request-scoped
+    profile routing. ``profile_name`` remains accepted for compatibility with
+    existing callers; without ``home_override`` the context-local Hermes home
+    is authoritative.
     """
     if override and override.strip():
         return Path(override).expanduser().resolve()
 
-    profile = (profile_name or "default").strip() or "default"
-    env_home = (os.environ.get("HERMES_HOME") or "").strip()
-    if env_home:
-        env_path = Path(env_home).expanduser()
-        if profile == "default" or env_path.name == profile:
-            return env_path.resolve()
+    from hermes_constants import get_hermes_home
 
-    root = Path.home() / ".hermes"
-    if profile == "default":
-        return root.resolve()
-    return (root / "profiles" / profile).resolve()
+    return Path(get_hermes_home()).expanduser().resolve()
 
 
 def _safe_text(value: Any) -> str:

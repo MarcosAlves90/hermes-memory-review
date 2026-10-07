@@ -147,6 +147,87 @@ def test_backend_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
     assert not (tmp_path / "pending" / "memory" / "reject123.json").exists()
 
 
+def test_backend_pending_records_follow_request_scoped_hermes_home(
+    monkeypatch, tmp_path, hermes_home_context
+):
+    from hermes_constants import reset_hermes_home_override, set_hermes_home_override
+
+    home_a = tmp_path / "profile-a"
+    home_b = tmp_path / "profile-b"
+    stage(
+        home_a,
+        "approve123",
+        {"action": "replace", "target": "memory", "old_text": "a-old", "matched_entry": "a-old", "content": "a-new"},
+        summary="profile A approval",
+    )
+    stage(
+        home_a,
+        "reject123",
+        {"action": "add", "target": "memory", "content": "keep A pending"},
+        summary="profile A rejection",
+        created=2,
+    )
+    stage(
+        home_b,
+        "approve123",
+        {"action": "replace", "target": "memory", "old_text": "b-old", "matched_entry": "b-old", "content": "b-new"},
+        summary="profile B approval",
+    )
+    stage(
+        home_b,
+        "reject123",
+        {"action": "add", "target": "memory", "content": "discard B pending"},
+        summary="profile B rejection",
+        created=2,
+    )
+
+    monkeypatch.setenv("HERMES_HOME", str(home_a))
+    api = load_api()
+    stores = {
+        home_a.resolve(): FakeMemoryStore(memory=["a-old"]),
+        home_b.resolve(): FakeMemoryStore(memory=["b-old"]),
+    }
+    monkeypatch.setattr(
+        api,
+        "_memory_store",
+        lambda: stores[Path(hermes_home_context.get_hermes_home()).resolve()],
+    )
+    monkeypatch.setattr(
+        api,
+        "_apply_pending_memory",
+        lambda payload, active_store: active_store.replace(
+            payload["target"],
+            payload["old_text"],
+            payload["content"],
+            matched_entry=payload["matched_entry"],
+        ),
+    )
+    client = client_for(api)
+
+    token = set_hermes_home_override(home_b)
+    try:
+        listing = client.get("/records")
+        approved = client.post("/records/approve123/decision", json={"action": "approve"})
+        rejected = client.post("/records/reject123/decision", json={"action": "reject"})
+    finally:
+        reset_hermes_home_override(token)
+
+    assert listing.status_code == 200
+    assert [record["summary"] for record in listing.json()["records"]] == [
+        "profile B rejection",
+        "profile B approval",
+    ]
+    assert approved.status_code == 200
+    assert rejected.status_code == 200
+    assert stores[home_b.resolve()].memory_entries == ["b-new"]
+    assert stores[home_a.resolve()].memory_entries == ["a-old"]
+    assert not list((home_b / "pending" / "memory").glob("*.json"))
+    assert sorted(path.name for path in (home_a / "pending" / "memory").glob("*.json")) == [
+        "approve123.json",
+        "reject123.json",
+    ]
+
+
 def test_backend_bulk_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
     stage(tmp_path, "add-one", {"action": "add", "target": "memory", "content": "one"})
     stage(tmp_path, "add-two", {"action": "add", "target": "memory", "content": "two"}, created=2)
