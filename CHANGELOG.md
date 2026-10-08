@@ -1,5 +1,19 @@
 # Changelog
 
+## 1.7.6 — 2026-10-08
+
+- Removed the model-facing `maxItems` schema constraint so Hermes' own
+  structured-output validation cannot abort Magi's retry on an overlong list;
+  Magi still enforces the entry-count cap after parsing.
+- Reused the same 60%-of-original hard character budget on all three passes,
+  eliminating the late-pass 55% reduction requirement that rejected previously
+  acceptable proposals. Preferred budgets still tighten on retries.
+- Retried Hermes schema errors and malformed structured responses up to three
+  attempts. Invalid candidates never replace the next retry's source; failures
+  leave stored memory untouched.
+- Added regression tests for overlong output, retry consistency, Hermes schema
+  exceptions, malformed output, and safe failure without Apply.
+
 ## 1.7.5 — 2026-10-07
 
 - Made the entry-content viewer vertically resizable in both Pending writes and

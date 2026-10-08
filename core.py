@@ -32,7 +32,10 @@ def _memory_compaction_max_entries(source_entry_count: int) -> int:
     return max(1, min(6, (source_entry_count + 3) // 4))
 
 
-def _memory_compaction_schema(max_entries: int) -> Dict[str, Any]:
+def _memory_compaction_schema() -> Dict[str, Any]:
+    # Hermes validates this schema *before* Magi receives the response. Keep
+    # count enforcement in Magi so an overlong array can be retried instead of
+    # turning into an unrecoverable Hermes schema exception.
     return {
         "type": "object",
         "properties": {
@@ -45,7 +48,6 @@ def _memory_compaction_schema(max_entries: int) -> Dict[str, Any]:
                 "type": "array",
                 "items": {"type": "string"},
                 "minItems": 1,
-                "maxItems": max_entries,
             }
         },
         "required": ["status", "reason", "entries"],
@@ -58,11 +60,11 @@ def _memory_compaction_budgets(source_chars: int, attempt: int) -> Tuple[int, in
     if attempt <= 1:
         hard_ratio, target_ratio = 0.60, 0.40
     elif attempt == 2:
-        hard_ratio, target_ratio = 0.45, 0.30
+        hard_ratio, target_ratio = 0.60, 0.30
     else:
-        # The final pass keeps the same acceptance threshold but pushes for a
-        # substantially denser rendering before it may declare a semantic floor.
-        hard_ratio, target_ratio = 0.45, 0.22
+        # Never reject an otherwise valid preview because the model needed a
+        # retry. Only the *preferred* compression increases between passes.
+        hard_ratio, target_ratio = 0.60, 0.22
     return max(1, int(source_chars * hard_ratio)), max(1, int(source_chars * target_ratio))
 
 
@@ -92,16 +94,24 @@ def _memory_compaction_instructions(
     previous_chars: Optional[int] = None,
     previous_entry_count: Optional[int] = None,
     previous_status: Optional[str] = None,
+    previous_validation_error: Optional[str] = None,
 ) -> str:
     hard_budget, target_budget = _memory_compaction_budgets(source_chars, attempt)
     retry_note = ""
     previous_hard_budget = _memory_compaction_budgets(source_chars, max(1, attempt - 1))[0]
     if previous_chars is not None and previous_chars > previous_hard_budget:
+        continues_from_candidate = (
+            previous_chars == input_chars and previous_entry_count == input_entry_count
+        )
         retry_note = (
-            f" The previous proposal was {previous_chars} characters, above its {previous_hard_budget}-character limit. "
-            "The input below is that previous proposal. Compress this candidate in place; do not re-expand it from the original "
-            "source or reintroduce details that the first pass already discarded. Keep only the durable/actionable core and "
-            "rewrite it substantially more densely."
+            f" The previous proposal was {previous_chars} characters, above its {previous_hard_budget}-character limit. " +
+            (
+                "The input below is that previous proposal. Compress this candidate in place; do not re-expand it from the "
+                "original source or reintroduce details that the first pass already discarded. "
+                if continues_from_candidate else
+                "The input below remains the last structurally valid memory corpus because the previous proposal was invalid. "
+            )
+            + "Keep only the durable/actionable core and rewrite it substantially more densely."
         )
     if previous_entry_count is not None and previous_entry_count > max_entries:
         retry_note += (
@@ -113,6 +123,12 @@ def _memory_compaction_instructions(
             " The previous pass claimed that further compaction was unsafe. Challenge that claim: inspect every remaining clause, "
             "remove anything duplicated, inferable, narrative, or merely explanatory, and rewrite the rest more densely before "
             "concluding that the semantic floor has been reached."
+        )
+    if previous_validation_error:
+        retry_note += (
+            f" The previous response was invalid ({previous_validation_error}). "
+            "Return valid JSON matching the schema with nonempty string entries, "
+            f"consolidated into at most {max_entries} entries. Preserve all durable facts from the input."
         )
 
     if attempt < MEMORY_COMPACTION_MAX_ATTEMPTS:
@@ -161,10 +177,11 @@ def build_memory_compaction_preview(
     before_tokens = estimate_memory_tokens(source_text)
     before_entry_count = len(source_entries)
     max_entries = _memory_compaction_max_entries(before_entry_count)
-    schema = _memory_compaction_schema(max_entries)
+    schema = _memory_compaction_schema()
     previous_chars: Optional[int] = None
     previous_entry_count: Optional[int] = None
     previous_status: Optional[str] = None
+    previous_validation_error: Optional[str] = None
     attempt_entries = list(source_entries)
     attempt_text = source_text
     best_candidate_chars = before_chars
@@ -186,6 +203,7 @@ def build_memory_compaction_preview(
             previous_chars,
             previous_entry_count,
             previous_status,
+            previous_validation_error,
         )
         try:
             completion_kwargs = {
@@ -203,6 +221,13 @@ def build_memory_compaction_preview(
             result = llm.complete_structured(
                 **completion_kwargs,
             )
+        except ValueError as exc:
+            if str(exc).startswith("Plugin LLM structured output did not match schema:"):
+                previous_validation_error = "JSON schema violation"
+                if attempt < MEMORY_COMPACTION_MAX_ATTEMPTS:
+                    continue
+                return {"success": False, "error": "AI compaction returned invalid structured output after 3 attempts; memory was not changed."}
+            return {"success": False, "error": f"AI compaction failed: {exc}"}
         except Exception as exc:
             return {"success": False, "error": f"AI compaction failed: {exc}"}
 
@@ -214,21 +239,32 @@ def build_memory_compaction_preview(
                 parsed = None
         raw_entries = parsed.get("entries") if isinstance(parsed, dict) else None
         if not isinstance(raw_entries, list):
-            return {"success": False, "error": "AI compaction returned no valid entries."}
+            previous_validation_error = "missing entries array or invalid JSON"
+            if attempt < MEMORY_COMPACTION_MAX_ATTEMPTS:
+                continue
+            return {"success": False, "error": "AI compaction returned no valid entries after 3 attempts; memory was not changed."}
         status = parsed.get("status", "compacted") if isinstance(parsed, dict) else "compacted"
         if status not in {"compacted", "cannot_compact_further"}:
-            return {"success": False, "error": f"AI compaction returned invalid status {status!r}."}
+            previous_validation_error = "invalid compaction status"
+            if attempt < MEMORY_COMPACTION_MAX_ATTEMPTS:
+                continue
+            return {"success": False, "error": "AI compaction returned an invalid status after 3 attempts; memory was not changed."}
         reason = str(parsed.get("reason") or "").strip() if isinstance(parsed, dict) else ""
 
         proposed: List[str] = []
+        invalid_entry = False
         for entry in raw_entries:
             if not isinstance(entry, str) or not entry.strip():
-                return {"success": False, "error": "AI compaction returned an invalid empty/non-text entry."}
+                invalid_entry = True
+                break
             normalized = entry.strip()
             if normalized not in proposed:
                 proposed.append(normalized)
-        if not proposed:
-            return {"success": False, "error": "AI compaction returned no usable entries."}
+        if invalid_entry or not proposed:
+            previous_validation_error = "empty or non-text entries"
+            if attempt < MEMORY_COMPACTION_MAX_ATTEMPTS:
+                continue
+            return {"success": False, "error": "AI compaction returned invalid entries after 3 attempts; memory was not changed."}
 
         proposed_text = delimiter.join(proposed)
         after_chars = len(proposed_text)
@@ -303,12 +339,15 @@ def build_memory_compaction_preview(
                 "attempts": attempt,
             }
 
-        if after_chars < len(attempt_text):
+        # A short but structurally invalid response must never replace the
+        # source for the next pass: doing so can silently discard facts.
+        if entry_count_ok and after_chars < len(attempt_text):
             attempt_entries = proposed
             attempt_text = proposed_text
-        previous_chars = len(attempt_text)
-        previous_entry_count = len(attempt_entries)
+        previous_chars = after_chars
+        previous_entry_count = after_entry_count
         previous_status = status
+        previous_validation_error = None
 
     if after_entry_count > max_entries:
         error = (

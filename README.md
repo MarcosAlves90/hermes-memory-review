@@ -1,11 +1,11 @@
-# Magi 1.7.3
+# Magi 1.7.6
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.7.3 provides a native **Magi** workspace in Hermes Desktop. After the
+Version 1.7.6 provides a native **Magi** workspace in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -62,22 +62,23 @@ memory corpus and is explicitly told not to preserve source entry boundaries. It
 extracts the durable, actionable core, merges related facts into a small number of
 thematic entries, and removes examples, explanations, narrative history, temporary
 status, repeated qualifiers, and low-value nuance that would not change a future
-answer or action. The structured output schema also caps the proposal entry count
-based on the source size. The invariant compaction policy is sent through Hermes'
+answer or action. The entry count is capped by Magi after parsing rather than by
+JSON Schema `maxItems`, because Hermes can reject schema violations before Magi
+can retry. The invariant compaction policy is sent through Hermes'
 supported `system_prompt` channel, while the stored memory remains lower-authority
-input data. Magi makes up to three progressively stricter passes. The first has a
-hard budget of 60% of the source footprint and the next two require at most 45%; the
-preferred targets tighten from 40% to 30% and finally 22%. Retry passes continue
-from the shortest candidate produced so far, which prevents discarded detail from
-being reintroduced, and explicitly challenge premature claims that no further safe
+input data. Magi makes up to three passes, each with the same hard acceptance
+budget of 60% of the original footprint (at least 40% reduction); preferred targets
+tighten from 40% to 30% and finally 22%. Valid, shorter candidates can be carried
+into later passes; structurally invalid proposals are discarded and retried from
+the last valid input. Retries explicitly challenge premature claims that no further safe
 compression is possible. Only the final pass may return `cannot_compact_further`,
 and only when further shortening would lose material durable information. In that
 case Magi reports an informational "no change" result with the model's reason and
 leaves memory untouched instead of surfacing a generic budget failure. The plugin
 also validates the output entry count itself after the LLM returns: if a
-provider/model ignores the JSON Schema `maxItems`, the proposal is retried rather
-than shown with too many entries; repeated violations fail closed without changing
-memory. While generation is running, Desktop shows an activity indicator and
+provider/model returns too many entries, the proposal is retried rather than shown;
+Hermes schema-validation failures are retried too. Repeated violations fail closed
+without changing memory. While generation is running, Desktop shows an activity indicator and
 live elapsed time. The review panel is height-bounded with its own scrolling area,
 and reports before/after entry counts, percentage reduction, token estimate, and
 model attribution.
@@ -198,6 +199,6 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.7.3 targets Hermes `>=0.21.5` and passes the repository verification
+Version 1.7.6 targets Hermes `>=0.21.5` and passes the repository verification
 suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.
