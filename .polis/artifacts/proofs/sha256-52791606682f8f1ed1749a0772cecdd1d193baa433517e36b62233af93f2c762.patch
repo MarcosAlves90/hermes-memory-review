@@ -1,0 +1,142 @@
+diff --git a/tests/test_desktop.py b/tests/test_desktop.py
+index d72b81c4400b5d18e8f8fb1137cd17631820b067..05ee88c665356d64f128fc89e71ca59900a4617a 100644
+--- a/tests/test_desktop.py
++++ b/tests/test_desktop.py
+@@ -737,7 +737,7 @@ def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
+ 
+     response = client_for(api).post(
+         "/memory/memory/compact",
+-        json={"source_fingerprint": fingerprint, "entries": ["first and second fact"]},
++        json={"source_fingerprint": fingerprint, "entries": ["both facts"]},
+     )
+ 
+     assert response.status_code == 200
+@@ -747,9 +747,46 @@ def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
+     assert operations == [
+         {"action": "remove", "old_text": "first fact", "matched_entry": "first fact"},
+         {"action": "remove", "old_text": "second fact", "matched_entry": "second fact"},
+-        {"action": "add", "content": "first and second fact"},
++        {"action": "add", "content": "both facts"},
+     ]
+-    assert response.json()["target"]["entries"] == [{"index": 0, "content": "first and second fact"}]
++    assert response.json()["target"]["entries"] == [{"index": 0, "content": "both facts"}]
++
++
++@pytest.mark.parametrize("target", ["memory", "user"])
++@pytest.mark.parametrize("proposed", [
++    ["A" * 75],  # 25% reduction misses the advertised 40% minimum.
++    ["A" * 61],  # One character over the hard ceiling must also fail.
++    ["A" * 20, "B" * 20],  # An over-count result must never be applied.
++    ["A" * 100],  # An unchanged proposal is not compaction.
++])
++def test_backend_rejects_compaction_that_does_not_meet_preview_contract(monkeypatch, target, proposed):
++    api = load_api()
++    store = FakeMemoryStore(**{target: ["A" * 100]})
++    monkeypatch.setattr(api, "_memory_store", lambda: store)
++
++    response = client_for(api).post(
++        f"/memory/{target}/compact",
++        json={"source_fingerprint": api._source_fingerprint(["A" * 100]), "entries": proposed},
++    )
++
++    assert response.status_code == 400
++    assert store.batch_calls == []
++    assert getattr(store, f"{target}_entries") == ["A" * 100]
++
++
++@pytest.mark.parametrize("target", ["memory", "user"])
++def test_backend_accepts_compaction_at_exact_hard_budget(monkeypatch, target):
++    api = load_api()
++    store = FakeMemoryStore(**{target: ["A" * 100]})
++    monkeypatch.setattr(api, "_memory_store", lambda: store)
++
++    response = client_for(api).post(
++        f"/memory/{target}/compact",
++        json={"source_fingerprint": api._source_fingerprint(["A" * 100]), "entries": ["A" * 60]},
++    )
++
++    assert response.status_code == 200
++    assert getattr(store, f"{target}_entries") == ["A" * 60]
+ 
+ 
+ def test_backend_rejects_stale_compaction_without_mutation(monkeypatch):
+@@ -783,7 +820,7 @@ def test_backend_rejects_concurrent_add_during_native_batch_lock(monkeypatch):
+ 
+     response = client_for(api).post(
+         "/memory/memory/compact",
+-        json={"source_fingerprint": fingerprint, "entries": ["old first; old second"]},
++        json={"source_fingerprint": fingerprint, "entries": ["old facts"]},
+     )
+ 
+     assert response.status_code == 409
+@@ -836,7 +873,7 @@ def write_before_native_lock(target, mutation, *, skip_drift=False):
+     return native_mutate(target, mutation, skip_drift=skip_drift)
+ store._mutate = write_before_native_lock
+ response = client.post("/memory/memory/compact", json={
+-    "source_fingerprint": original, "entries": ["merged first and second"]})
++    "source_fingerprint": original, "entries": ["old facts"]})
+ assert response.status_code == 409, response.text
+ disk = MemoryStore()
+ disk.load_from_disk()
+@@ -846,10 +883,10 @@ del store._mutate
+ store.load_from_disk()
+ refreshed = api._source_fingerprint(list(store.memory_entries))
+ response = client.post("/memory/memory/compact", json={
+-    "source_fingerprint": refreshed, "entries": ["merged first, second and third"]})
++    "source_fingerprint": refreshed, "entries": ["all facts"]})
+ assert response.status_code == 200, response.text
+ disk.load_from_disk()
+-assert disk.memory_entries == ["merged first, second and third"]
++assert disk.memory_entries == ["all facts"]
+ assert "_mutate" not in vars(store)
+ '''
+     env = {**os.environ, "HERMES_HOME": str(tmp_path),
+@@ -864,19 +901,19 @@ assert "_mutate" not in vars(store)
+ def test_backend_surfaces_compaction_batch_failure_without_partial_write(monkeypatch):
+     api = load_api()
+     store = FakeMemoryStore(
+-        memory=["fact"],
++        memory=["original durable fact with extra detail"],
+         batch_result={"success": False, "error": "Compaction rejected."},
+     )
+     monkeypatch.setattr(api, "_memory_store", lambda: store)
+ 
+     response = client_for(api).post(
+         "/memory/memory/compact",
+-        json={"source_fingerprint": api._source_fingerprint(["fact"]), "entries": ["short fact"]},
++        json={"source_fingerprint": api._source_fingerprint(store.memory_entries), "entries": ["short fact"]},
+     )
+ 
+     assert response.status_code == 409
+     assert len(store.batch_calls) == 1
+-    assert store.memory_entries == ["fact"]
++    assert store.memory_entries == ["original durable fact with extra detail"]
+ 
+ 
+ def test_backend_returns_not_found_for_unknown_record(monkeypatch, tmp_path):
+diff --git a/tests/test_plugin.py b/tests/test_plugin.py
+index 340aee1df9862a9d1d1011d81a2353bdfe045ba6..68ff73c460d38a9546ae11fa51147d4bf75962e7 100644
+--- a/tests/test_plugin.py
++++ b/tests/test_plugin.py
+@@ -214,6 +214,21 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
+     assert result["after_tokens"] < result["before_tokens"]
+ 
+ 
++def test_compaction_preview_rejects_same_length_single_character_proposal(monkeypatch, tmp_path):
++    plugin = load_plugin()
++    llm = FakeLlm(["Y"])
++    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
++    store = FakePreviewStore(memory=["X"])
++    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
++    plugin.register(ctx)
++
++    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
++
++    assert result["success"] is False
++    assert result["attempts"] == 3
++    assert store.memory_entries == ["X"]
++
++
+ def test_compaction_preview_retries_when_proposal_breaks_advertised_character_budget(monkeypatch, tmp_path):
+     plugin = load_plugin()
+     original = ["A" * 100, "B" * 100, "C" * 100, "D" * 100]

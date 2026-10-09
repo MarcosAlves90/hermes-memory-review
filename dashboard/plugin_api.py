@@ -26,6 +26,8 @@ MagiReview = _core["MagiReview"]
 resolve_hermes_home = _core["resolve_hermes_home"]
 build_memory_compaction_preview = _core["build_memory_compaction_preview"]
 memory_source_fingerprint = _core["memory_source_fingerprint"]
+_memory_compaction_budgets = _core["_memory_compaction_budgets"]
+_memory_compaction_max_entries = _core["_memory_compaction_max_entries"]
 
 router = APIRouter()
 
@@ -481,6 +483,21 @@ def apply_memory_compaction(target: str, body: MemoryCompactionApplyRequest) -> 
                 "success": False,
                 "error": "Stored memory changed after this compaction preview was generated. Refresh and create a new preview.",
             },
+        )
+
+    # The HTTP client supplies these entries, so enforce the same invariants
+    # that the preview builder checks before accepting an AI proposal.
+    max_entries = _memory_compaction_max_entries(len(current))
+    if len(proposed) > max_entries:
+        raise HTTPException(status_code=400, detail=f"Compaction must contain at most {max_entries} entries.")
+    delimiter = _entry_delimiter()
+    source_chars = len(delimiter.join(current))
+    proposed_chars = len(delimiter.join(proposed))
+    max_chars, _ = _memory_compaction_budgets(source_chars, 1)
+    if proposed_chars >= source_chars or proposed_chars > max_chars:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Compaction must reduce memory to at most {max_chars} characters and be shorter than the original.",
         )
 
     operations = [

@@ -1,0 +1,40 @@
+{"event":"gate_started","gate":"regression"}
+{"event":"command_finished","gate":"regression","status":"FAIL","argv":["bash","ci/test.sh"],"cwd":".","exit_code":1,"duration_ms":13436,"stdout_bytes":13146,"stderr_bytes":0,"stdout_sha256":"246c047960c55740d525b4d30feb0e1440e1b39d4ab1393116f6d6ccc9ebc4d6","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"oracle_checked","gate":"regression","status":"PASS","oracle":"baseline_output_contains","oracle_index":0}
+{"event":"oracle_checked","gate":"regression","status":"PASS","oracle":"baseline_output_contains","oracle_index":1}
+{"event":"gate_finished","gate":"regression","status":"PASS"}
+{"event":"gate_started","gate":"regression"}
+{"event":"command_finished","gate":"regression","status":"PASS","argv":["bash","ci/test.sh"],"cwd":".","exit_code":0,"duration_ms":12851,"stdout_bytes":775,"stderr_bytes":0,"stdout_sha256":"7590d37d074037169ecb981e026a4a515c8fad73fa115f7010b48251fd1cb8ce","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"gate_finished","gate":"regression","status":"PASS"}
+{"event":"gate_started","gate":"behavior"}
+{"event":"command_finished","gate":"behavior","status":"PASS","argv":["bash","ci/test.sh"],"cwd":".","exit_code":0,"duration_ms":11977,"stdout_bytes":775,"stderr_bytes":0,"stdout_sha256":"0ea0007555da0cee914030b0714abd101ad6ab12f86cd30e01a09d62623bda37","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"gate_finished","gate":"behavior","status":"PASS"}
+{"event":"gate_started","gate":"affected"}
+{"event":"command_finished","gate":"affected","status":"PASS","argv":["bash","ci/test.sh"],"cwd":".","exit_code":0,"duration_ms":12625,"stdout_bytes":775,"stderr_bytes":0,"stdout_sha256":"ae8f72dcd9c17441b5b2dd29db16590a08f9ddf032b268843cb31b02787f1f02","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"gate_finished","gate":"affected","status":"PASS"}
+{"event":"validation_configured","gate":"policy","validation_level":"strict","enabled_gates":["test.complete","coverage"],"disabled_gates":["lint","typecheck","build","smoke","compatibility","dependency","migration","security","platform"],"deferred_gates":[]}
+{"event":"gate_started","gate":"test.complete"}
+{"event":"command_finished","gate":"test.complete","status":"PASS","argv":["bash","ci/test.sh"],"cwd":".","exit_code":0,"duration_ms":12335,"stdout_bytes":775,"stderr_bytes":0,"stdout_sha256":"8e4aaabe885a319d78682a3d8c3df97c9712c280ed96d7609679347fe0c87642","stderr_sha256":"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"gate_finished","gate":"test.complete","status":"PASS"}
+{"event":"gate_started","gate":"coverage"}
+{"event":"command_finished","gate":"coverage","status":"PASS","argv":["bash","ci/coverage.sh"],"cwd":".","exit_code":0,"duration_ms":12299,"stdout_bytes":775,"stderr_bytes":33,"stdout_sha256":"011633335ea1ad5ce976f7ee636b87670da04961b0667469a8b92fd5bffbadd3","stderr_sha256":"64272b903b08f58f9de2edb3a3f2264ee1ca82b6e1411d3f8d6117f279e25c5b","stdout_truncated":false,"stderr_truncated":false,"environment_mode":"clean","environment_pass":["PATH","HOME","TMPDIR","TMP","TEMP","SystemRoot","COMSPEC","PATHEXT","USERPROFILE","LOCALAPPDATA"]}
+{"event":"coverage_measured","gate":"coverage","status":"PASS","adapter":"cobertura-v1","report":"coverage.xml","metric":"line_coverage_percent","covered_lines":1859,"total_lines":1938,"value_percent":95.92363261093911,"operator":"\u003e","threshold_percent":95}
+{"event":"gate_finished","gate":"coverage","status":"PASS"}
+{"event":"gate_started","gate":"lint"}
+{"event":"gate_finished","gate":"lint","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for lint"}
+{"event":"gate_started","gate":"typecheck"}
+{"event":"gate_finished","gate":"typecheck","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for typecheck"}
+{"event":"gate_started","gate":"build"}
+{"event":"gate_finished","gate":"build","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for build"}
+{"event":"gate_started","gate":"smoke"}
+{"event":"gate_finished","gate":"smoke","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for smoke"}
+{"event":"gate_started","gate":"compatibility"}
+{"event":"gate_finished","gate":"compatibility","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for compatibility"}
+{"event":"gate_started","gate":"dependency"}
+{"event":"gate_finished","gate":"dependency","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for dependency"}
+{"event":"gate_started","gate":"migration"}
+{"event":"gate_finished","gate":"migration","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for migration"}
+{"event":"gate_started","gate":"security"}
+{"event":"gate_finished","gate":"security","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for security"}
+{"event":"gate_started","gate":"platform"}
+{"event":"gate_finished","gate":"platform","status":"NOT_APPLICABLE","reason":"custom profile has no explicit command for platform"}

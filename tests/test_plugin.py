@@ -214,6 +214,21 @@ def test_compaction_preview_retries_when_first_proposal_does_not_reduce_footprin
     assert result["after_tokens"] < result["before_tokens"]
 
 
+def test_compaction_preview_rejects_same_length_single_character_proposal(monkeypatch, tmp_path):
+    plugin = load_plugin()
+    llm = FakeLlm(["Y"])
+    ctx = FakeCtx({"home_override": str(tmp_path)}, llm=llm)
+    store = FakePreviewStore(memory=["X"])
+    monkeypatch.setattr(plugin, "_memory_store", lambda: store)
+    plugin.register(ctx)
+
+    result = json.loads(ctx.commands["memory-compact-preview"]["handler"]("memory"))
+
+    assert result["success"] is False
+    assert result["attempts"] == 3
+    assert store.memory_entries == ["X"]
+
+
 def test_compaction_preview_retries_when_proposal_breaks_advertised_character_budget(monkeypatch, tmp_path):
     plugin = load_plugin()
     original = ["A" * 100, "B" * 100, "C" * 100, "D" * 100]

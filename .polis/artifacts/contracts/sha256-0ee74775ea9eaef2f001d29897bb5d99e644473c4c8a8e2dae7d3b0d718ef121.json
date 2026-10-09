@@ -1,0 +1,193 @@
+{
+  "schema_version": 6,
+  "kind": "defect",
+  "scope": {
+    "allowed_paths": [
+      "core.py",
+      "dashboard/plugin_api.py",
+      "tests/test_desktop.py",
+      "tests/test_plugin.py"
+    ]
+  },
+  "test_scope": {
+    "allowed_paths": [
+      "tests/test_desktop.py",
+      "tests/test_plugin.py"
+    ]
+  },
+  "development_method": "strict_sdd_tdd_v2",
+  "specification": {
+    "objective": "Ensure Magi stored-memory compaction never accepts a preview or apply payload that violates its actual reduction and entry-count postconditions.",
+    "requirements": [
+      {
+        "id": "REQ-001",
+        "statement": "For memory and user targets reject HTTP compact-apply payloads whose character count exceeds 60% of source, does not shrink source, or whose entry count exceeds source-derived cap."
+      },
+      {
+        "id": "REQ-002",
+        "statement": "Keep whole-store stale fingerprint and native locked batch semantics; rejection must not mutate stored memory."
+      },
+      {
+        "id": "REQ-003",
+        "statement": "Compaction previews on tiny sources must not report success for an unchanged-length proposed replacement."
+      },
+      {
+        "id": "REQ-004",
+        "statement": "Accept valid proposals at exactly the hard character limit; preserve preview-model and existing Hermes plugin contracts."
+      }
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "AC-001",
+        "statement": "Parameterized endpoint regression tests fail on baseline for over-budget, over-entry-count and non-reducing proposals, and pass after correction for both targets.",
+        "requirements": [
+          "REQ-001",
+          "REQ-002"
+        ],
+        "proof": "regression"
+      },
+      {
+        "id": "AC-002",
+        "statement": "Tiny-source equal-length preview regression fails on baseline and passes on corrected source.",
+        "requirements": [
+          "REQ-003"
+        ],
+        "proof": "regression"
+      },
+      {
+        "id": "AC-003",
+        "statement": "Boundary-case 60% proposals apply successfully; full existing tests, coverage and Hermes native plugin validation pass.",
+        "requirements": [
+          "REQ-004"
+        ],
+        "proof": "regression"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "INV-001",
+        "statement": "Never write MEMORY.md or USER.md directly; native Hermes MemoryStore owns durable commits."
+      },
+      {
+        "id": "INV-002",
+        "statement": "Preserve configured LLM model routing and explicit preview-first apply approval."
+      },
+      {
+        "id": "INV-003",
+        "statement": "No mutation is permitted after stale fingerprint or validation failures."
+      }
+    ],
+    "forbidden_states": [
+      {
+        "id": "FORBID-001",
+        "statement": "A successful apply can store entries larger than 60% of live source characters or exceed count cap."
+      },
+      {
+        "id": "FORBID-002",
+        "statement": "A preview with no reduction can be accepted on tiny inputs."
+      }
+    ],
+    "inputs": [
+      {
+        "id": "IN-001",
+        "statement": "Existing stored memory and user entries with Hermes-owned entry delimiter."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "OUT-001",
+        "statement": "Valid compacted entries applied atomically or HTTP 400/409 without a memory mutation."
+      }
+    ],
+    "failure_semantics": [
+      {
+        "id": "FAIL-001",
+        "statement": "Invalid compaction proposal rejects the request; concurrent updates cause a conflict and do not change stored memory."
+      }
+    ]
+  },
+  "baseline_lock": {
+    "git_object_format": "sha1",
+    "base_commit": "603d0d2d6fc4e4b511b538abdaad616405a643ff",
+    "base_tree": "6ed527f0ba3c60390a7d749e465d49af1c26e649",
+    "policy_sha256": "ad0c9c1e2ae90949ee1dfebaa10c98f085ef260284daae61f4fe67d7b95c2529",
+    "specification_sha256": "f76827fb001f5672fd032b01d327eb42423d270320e007a1b1b5efeb21799328"
+  },
+  "behavior": {
+    "argv": [
+      "bash",
+      "ci/test.sh"
+    ],
+    "cwd": ".",
+    "timeout_seconds": 1200,
+    "environment": {
+      "mode": "clean",
+      "pass": [
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "SystemRoot",
+        "COMSPEC",
+        "PATHEXT",
+        "USERPROFILE",
+        "LOCALAPPDATA"
+      ]
+    }
+  },
+  "affected": {
+    "argv": [
+      "bash",
+      "ci/test.sh"
+    ],
+    "cwd": ".",
+    "timeout_seconds": 1200,
+    "environment": {
+      "mode": "clean",
+      "pass": [
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "SystemRoot",
+        "COMSPEC",
+        "PATHEXT",
+        "USERPROFILE",
+        "LOCALAPPDATA"
+      ]
+    }
+  },
+  "regression": {
+    "mode": "red_green",
+    "command": {
+      "argv": [
+        "bash",
+        "ci/test.sh"
+      ],
+      "cwd": ".",
+      "timeout_seconds": 1200,
+      "environment": {
+        "mode": "clean",
+        "pass": [
+          "PATH",
+          "HOME",
+          "TMPDIR",
+          "TMP",
+          "TEMP",
+          "SystemRoot",
+          "COMSPEC",
+          "PATHEXT",
+          "USERPROFILE",
+          "LOCALAPPDATA"
+        ]
+      }
+    },
+    "baseline_exit_code": 1,
+    "baseline_output_contains": [
+      "test_backend_rejects_compaction_that_does_not_meet_preview_contract",
+      "AssertionError"
+    ]
+  }
+}

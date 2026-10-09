@@ -272,7 +272,7 @@ def build_memory_compaction_preview(
         after_entry_count = len(proposed)
         reduction_percent = round((1 - (after_chars / before_chars)) * 100, 1)
         entry_count_ok = after_entry_count <= max_entries
-        budget_ok = after_chars <= hard_budget
+        budget_ok = after_chars <= hard_budget and after_chars < before_chars
         if entry_count_ok and budget_ok:
             return {
                 "success": True,

@@ -737,7 +737,7 @@ def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
 
     response = client_for(api).post(
         "/memory/memory/compact",
-        json={"source_fingerprint": fingerprint, "entries": ["first and second fact"]},
+        json={"source_fingerprint": fingerprint, "entries": ["both facts"]},
     )
 
     assert response.status_code == 200
@@ -747,9 +747,46 @@ def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
     assert operations == [
         {"action": "remove", "old_text": "first fact", "matched_entry": "first fact"},
         {"action": "remove", "old_text": "second fact", "matched_entry": "second fact"},
-        {"action": "add", "content": "first and second fact"},
+        {"action": "add", "content": "both facts"},
     ]
-    assert response.json()["target"]["entries"] == [{"index": 0, "content": "first and second fact"}]
+    assert response.json()["target"]["entries"] == [{"index": 0, "content": "both facts"}]
+
+
+@pytest.mark.parametrize("target", ["memory", "user"])
+@pytest.mark.parametrize("proposed", [
+    ["A" * 75],  # 25% reduction misses the advertised 40% minimum.
+    ["A" * 61],  # One character over the hard ceiling must also fail.
+    ["A" * 20, "B" * 20],  # An over-count result must never be applied.
+    ["A" * 100],  # An unchanged proposal is not compaction.
+])
+def test_backend_rejects_compaction_that_does_not_meet_preview_contract(monkeypatch, target, proposed):
+    api = load_api()
+    store = FakeMemoryStore(**{target: ["A" * 100]})
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).post(
+        f"/memory/{target}/compact",
+        json={"source_fingerprint": api._source_fingerprint(["A" * 100]), "entries": proposed},
+    )
+
+    assert response.status_code == 400
+    assert store.batch_calls == []
+    assert getattr(store, f"{target}_entries") == ["A" * 100]
+
+
+@pytest.mark.parametrize("target", ["memory", "user"])
+def test_backend_accepts_compaction_at_exact_hard_budget(monkeypatch, target):
+    api = load_api()
+    store = FakeMemoryStore(**{target: ["A" * 100]})
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+
+    response = client_for(api).post(
+        f"/memory/{target}/compact",
+        json={"source_fingerprint": api._source_fingerprint(["A" * 100]), "entries": ["A" * 60]},
+    )
+
+    assert response.status_code == 200
+    assert getattr(store, f"{target}_entries") == ["A" * 60]
 
 
 def test_backend_rejects_stale_compaction_without_mutation(monkeypatch):
@@ -783,7 +820,7 @@ def test_backend_rejects_concurrent_add_during_native_batch_lock(monkeypatch):
 
     response = client_for(api).post(
         "/memory/memory/compact",
-        json={"source_fingerprint": fingerprint, "entries": ["old first; old second"]},
+        json={"source_fingerprint": fingerprint, "entries": ["old facts"]},
     )
 
     assert response.status_code == 409
@@ -836,7 +873,7 @@ def write_before_native_lock(target, mutation, *, skip_drift=False):
     return native_mutate(target, mutation, skip_drift=skip_drift)
 store._mutate = write_before_native_lock
 response = client.post("/memory/memory/compact", json={
-    "source_fingerprint": original, "entries": ["merged first and second"]})
+    "source_fingerprint": original, "entries": ["old facts"]})
 assert response.status_code == 409, response.text
 disk = MemoryStore()
 disk.load_from_disk()
@@ -846,10 +883,10 @@ del store._mutate
 store.load_from_disk()
 refreshed = api._source_fingerprint(list(store.memory_entries))
 response = client.post("/memory/memory/compact", json={
-    "source_fingerprint": refreshed, "entries": ["merged first, second and third"]})
+    "source_fingerprint": refreshed, "entries": ["all facts"]})
 assert response.status_code == 200, response.text
 disk.load_from_disk()
-assert disk.memory_entries == ["merged first, second and third"]
+assert disk.memory_entries == ["all facts"]
 assert "_mutate" not in vars(store)
 '''
     env = {**os.environ, "HERMES_HOME": str(tmp_path),
@@ -864,19 +901,19 @@ assert "_mutate" not in vars(store)
 def test_backend_surfaces_compaction_batch_failure_without_partial_write(monkeypatch):
     api = load_api()
     store = FakeMemoryStore(
-        memory=["fact"],
+        memory=["original durable fact with extra detail"],
         batch_result={"success": False, "error": "Compaction rejected."},
     )
     monkeypatch.setattr(api, "_memory_store", lambda: store)
 
     response = client_for(api).post(
         "/memory/memory/compact",
-        json={"source_fingerprint": api._source_fingerprint(["fact"]), "entries": ["short fact"]},
+        json={"source_fingerprint": api._source_fingerprint(store.memory_entries), "entries": ["short fact"]},
     )
 
     assert response.status_code == 409
     assert len(store.batch_calls) == 1
-    assert store.memory_entries == ["fact"]
+    assert store.memory_entries == ["original durable fact with extra detail"]
 
 
 def test_backend_returns_not_found_for_unknown_record(monkeypatch, tmp_path):
