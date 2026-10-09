@@ -79,7 +79,7 @@ function SearchBox({ value, onChange, placeholder, ariaLabel }) {
 
 function StatCard({ label, value, detail, tone = 'default' }) {
   return jsxs('div', {
-    className: `min-w-0 rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) px-3 py-2.5 ${PANEL_TRANSITION}`,
+    className: `min-w-0 rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) px-3 py-2 ${PANEL_TRANSITION}`,
     children: [
       jsxs('div', {
         className: 'flex items-center gap-2',
@@ -88,7 +88,7 @@ function StatCard({ label, value, detail, tone = 'default' }) {
           jsx('span', { className: 'text-[0.6875rem] font-medium uppercase tracking-wide text-(--ui-text-tertiary)', children: label })
         ]
       }),
-      jsx('div', { className: 'mt-1 text-lg font-semibold tabular-nums', children: String(value ?? 0) }),
+      jsx('div', { className: 'mt-1 text-base font-semibold tabular-nums', children: String(value ?? 0) }),
       detail ? jsx('div', { className: 'mt-0.5 truncate text-[0.6875rem] text-(--ui-text-quaternary)', children: detail }) : null
     ]
   })
@@ -145,14 +145,15 @@ function MetaField({ label, value }) {
   })
 }
 
-function ContentBlock({ label, text }) {
+function ContentBlock({ label, text, side }) {
   if (!text) return null
   return jsxs('section', {
-    className: 'mt-3',
+    className: 'mt-3 min-w-0',
+    'data-change-side': side,
     children: [
       jsx('h4', { className: 'mb-1 text-xs font-medium text-(--ui-text-tertiary)', children: label }),
       jsx('div', {
-        className: 'whitespace-pre-wrap break-words rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-3 text-sm leading-relaxed',
+        className: `h-full whitespace-pre-wrap break-words rounded-lg border border-(--ui-stroke-secondary) bg-(--chrome-action-hover) p-3 text-sm leading-relaxed ${side === 'after' ? 'border-l-2 border-l-(--ui-accent)' : ''}`,
         children: String(text)
       })
     ]
@@ -177,8 +178,15 @@ function OperationCard({ op, index, total }) {
         ]
       }),
       action === 'add' ? jsx(ContentBlock, { label: 'Content to add', text: content }) : null,
-      action === 'replace' ? jsx(ContentBlock, { label: 'Current entry', text: before }) : null,
-      action === 'replace' ? jsx(ContentBlock, { label: 'Replacement', text: content }) : null,
+      action === 'replace'
+        ? jsx('div', {
+            className: 'grid gap-3 xl:grid-cols-2',
+            children: [
+              jsx(ContentBlock, { label: 'Before · current entry', text: before || 'Original entry unavailable in this proposal', side: 'before' }, 'before'),
+              jsx(ContentBlock, { label: 'After · proposed replacement', text: content || 'Replacement content unavailable in this proposal', side: 'after' }, 'after')
+            ]
+          })
+        : null,
       action === 'remove' ? jsx(ContentBlock, { label: 'Entry to remove', text: before }) : null,
       !['add', 'replace', 'remove'].includes(action)
         ? jsx('pre', {
@@ -250,7 +258,7 @@ function OverviewView({ detail }) {
   })
 }
 
-function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
+function PendingWritesPage({ loadRecords, loadDetail, runDecision, source, onOpenStoredMemory }) {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState('')
   const [view, setView] = useState('overview')
@@ -280,11 +288,8 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
         : records,
     [records, query]
   )
-  const currentId =
-    (selected && records.some(record => record.id === selected) && selected) ||
-    filtered[0]?.id ||
-    records[0]?.id ||
-    ''
+  const selectedVisible = filtered.some(record => record.id === selected)
+  const currentId = selectedVisible ? selected : filtered[0]?.id || ''
   const currentRecord = records.find(record => record.id === currentId) || null
 
   const detail = useQuery({
@@ -361,7 +366,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                   }),
                   jsx('p', {
                     className: 'mt-0.5 text-xs leading-relaxed text-(--ui-text-tertiary)',
-                    children: 'Inspect proposed memory changes, resolve conflicts, and keep the durable store intentional.'
+                    children: 'Compare each proposed change with the existing memory, then approve or reject it.'
                   })
                 ]
               }),
@@ -369,11 +374,12 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
             ]
           }),
           jsx('div', {
-            className: 'mt-3 grid grid-cols-3 gap-2',
+            'aria-label': 'Pending queue summary',
+            className: 'mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs',
             children: [
-              jsx(StatCard, { label: 'Pending', value: listing.data?.count ?? 0, detail: 'total proposals' }, 'pending'),
-              jsx(StatCard, { label: 'Ready', value: readyCount, detail: 'safe to apply', tone: readyCount ? 'accent' : 'default' }, 'ready'),
-              jsx(StatCard, { label: 'Attention', value: blockedApprovalCount, detail: missingTargetCount ? `${missingTargetCount} obsolete` : 'blocked proposals', tone: blockedApprovalCount ? 'danger' : 'default' }, 'attention')
+              jsxs('span', { className: 'font-medium tabular-nums', children: [listing.data?.count ?? 0, ' pending'] }),
+              jsxs('span', { className: 'flex items-center gap-1.5 text-(--ui-text-tertiary)', children: [jsx(StatusDot, { tone: readyCount ? 'accent' : 'default' }), `${readyCount} ready to approve`] }),
+              jsxs('span', { className: `flex items-center gap-1.5 ${blockedApprovalCount ? 'text-(--ui-danger,#f87171)' : 'text-(--ui-text-tertiary)'}`, children: [jsx(StatusDot, { tone: blockedApprovalCount ? 'danger' : 'default' }), `${blockedApprovalCount} need attention${missingTargetCount ? ` · ${missingTargetCount} obsolete` : ''}`] })
             ]
           })
         ]
@@ -420,7 +426,19 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
               ]
             })
         : null,
-      jsxs('div', {
+      records.length === 0 && !listing.isLoading
+        ? jsx(EmptyState, {
+            title: 'Nothing to review',
+            description: 'New memory proposals will appear here. You can inspect and edit the durable entries in Stored memory.',
+            action: jsx(ActionButton, { onClick: onOpenStoredMemory, children: 'Stored memory' })
+          })
+        : filtered.length === 0 && !listing.isLoading
+          ? jsx(EmptyState, {
+              title: 'No matching proposals',
+              description: 'No pending change matches your search. Clear the search to review the queue.',
+              action: jsx(ActionButton, { onClick: () => setSearch(''), children: 'Clear search' })
+            })
+          : jsxs('div', {
         className: 'grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(15rem,22rem)_1fr]',
         children: [
           jsxs('aside', {
@@ -493,7 +511,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                     })
             ]
           }),
-          jsxs('main', {
+          filtered.length ? jsxs('main', {
             className: 'flex min-h-0 min-w-0 flex-col overflow-auto',
             children: [
               currentId
@@ -605,7 +623,7 @@ function PendingWritesPage({ loadRecords, loadDetail, runDecision, source }) {
                         description: 'Choose a pending write from the queue to inspect its operations and decide what should happen.'
                       })
             ]
-          })
+          }) : null
         ]
       }),
       listing.data?.issues?.length
@@ -858,25 +876,19 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
             ]
           }),
           jsx('div', {
-            className: 'mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3',
+            className: 'mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4',
             children: [
               jsx(StatCard, { label: 'Entries', value: targetData.count ?? 0, detail: targetLabel, tone: 'accent' }, 'entries'),
               jsx(StatCard, { label: 'Characters', value: `${targetData.used_chars ?? 0}`, detail: `of ${targetData.char_limit ?? 0} available` }, 'characters'),
-              jsx(StatCard, { label: 'Estimated tokens', value: `~${targetData.estimated_tokens ?? 0}`, detail: `~${targetData.estimated_token_limit ?? 0} budget · tokens estimated` }, 'tokens')
-            ]
-          }),
-          jsxs('div', {
-            className: 'mt-3 rounded-lg border border-(--ui-stroke-secondary) px-3 py-2.5',
-            children: [
+              jsx(StatCard, { label: 'Estimated tokens', value: `~${targetData.estimated_tokens ?? 0}`, detail: `~${targetData.estimated_token_limit ?? 0} budget · tokens estimated` }, 'tokens'),
               jsxs('div', {
-                className: 'mb-2 flex items-center gap-2 text-xs',
+                className: 'flex min-w-0 flex-col justify-center rounded-lg border border-(--ui-stroke-secondary) px-3 py-2',
                 children: [
-                  jsx('span', { className: 'font-medium', children: `${targetData.usage_percent ?? 0}% used` }),
-                  jsx('span', { className: 'text-(--ui-text-tertiary)', children: `${Math.max(0, (targetData.char_limit ?? 0) - (targetData.used_chars ?? 0))} chars free` }),
-                  jsx('span', { className: 'ml-auto text-(--ui-text-quaternary)', children: targetData.usage_percent >= 80 ? 'Consider compacting soon' : 'Healthy budget' })
+                  jsx('div', { className: 'mb-2 text-xs font-medium', children: `${targetData.usage_percent ?? 0}% of character budget` }),
+                  jsx(UsageBar, { percent: targetData.usage_percent }),
+                  jsx('div', { className: 'mt-1.5 text-[0.6875rem] text-(--ui-text-tertiary)', children: targetData.usage_percent >= 80 ? 'Consider compacting soon' : `${Math.max(0, (targetData.char_limit ?? 0) - (targetData.used_chars ?? 0))} chars free` })
                 ]
-              }),
-              jsx(UsageBar, { percent: targetData.usage_percent })
+              }, 'budget')
             ]
           })
         ]
@@ -965,7 +977,7 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
                         className: 'mr-auto',
                         children: [
                           jsx('h2', { className: 'text-sm font-semibold', children: 'AI compaction preview' }),
-                          jsx('p', { className: 'mt-0.5 text-xs text-(--ui-text-tertiary)', children: 'Review the leaner memory before applying. Nothing has been written yet.' })
+                          jsx('p', { className: 'mt-0.5 text-xs text-(--ui-text-tertiary)', children: 'Compare current and proposed memory before applying. Nothing has been written yet.' })
                         ]
                       }),
                       jsx(Badge, { tone: 'accent', children: `${compactionPreview.reduction_percent ?? '?'}% smaller` }),
@@ -975,17 +987,19 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
                   jsx('div', {
                     className: 'mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4',
                     children: [
-                      jsx(MetaField, { label: 'Tokens', value: `~${compactionPreview.before_tokens} → ~${compactionPreview.after_tokens}` }, 'tokens'),
-                      jsx(MetaField, { label: 'Entries', value: `${compactionPreview.before_entry_count ?? '?'} → ${compactionPreview.after_entry_count ?? '?'}` }, 'entries'),
-                      jsx(MetaField, { label: 'Reduction', value: `${compactionPreview.reduction_percent ?? '?'}%` }, 'reduction'),
+                      jsx(MetaField, { label: 'Current · before', value: `${compactionPreview.before_entry_count ?? '?'} entries · ~${compactionPreview.before_tokens} tokens` }, 'before'),
+                      jsx(MetaField, { label: 'Proposed · after', value: `${compactionPreview.after_entry_count ?? '?'} entries · ~${compactionPreview.after_tokens} tokens` }, 'after'),
+                      jsx(MetaField, { label: 'Estimated reduction', value: `${compactionPreview.reduction_percent ?? '?'}%` }, 'reduction'),
                       jsx(MetaField, { label: 'Model', value: [compactionPreview.provider, compactionPreview.model].filter(Boolean).join(' / ') || 'Default model' }, 'model')
                     ]
                   })
                 ]
               }),
-              jsx('div', {
-                className: 'min-h-0 flex-1 space-y-2 overflow-auto px-4 py-3',
-                children: (compactionPreview.proposed_entries || []).map((entry, index) =>
+              jsxs('div', {
+                className: 'min-h-0 flex-1 overflow-auto px-4 py-3',
+                children: [
+                  jsx('h3', { className: 'mb-2 text-xs font-semibold', children: 'Proposed memory entries' }),
+                  jsx('div', { className: 'space-y-2', children: (compactionPreview.proposed_entries || []).map((entry, index) =>
                   jsxs('div', {
                     className: `rounded-lg border border-(--ui-stroke-secondary) bg-(--ui-bg-primary,transparent) p-3 ${PANEL_TRANSITION}`,
                     children: [
@@ -996,7 +1010,8 @@ function StoredMemoryPage({ loadStoredMemory, saveStoredMemory, addStoredMemory,
                       jsx('div', { className: 'whitespace-pre-wrap break-words text-sm', children: entry })
                     ]
                   }, `compact:${index}`)
-                )
+                ) })
+                ]
               }),
               jsxs('div', {
                 className: 'flex shrink-0 flex-wrap items-center gap-2 border-t border-(--ui-stroke-secondary) px-4 py-3',
@@ -1250,7 +1265,7 @@ function MagiPage(props) {
         className: 'min-h-0 flex-1 overflow-hidden',
         children:
           mode === 'pending'
-            ? jsx(PendingWritesPage, props)
+            ? jsx(PendingWritesPage, { ...props, onOpenStoredMemory: () => setMode('stored') })
             : jsx(StoredMemoryPage, {
                 loadStoredMemory: props.loadStoredMemory,
                 saveStoredMemory: props.saveStoredMemory,

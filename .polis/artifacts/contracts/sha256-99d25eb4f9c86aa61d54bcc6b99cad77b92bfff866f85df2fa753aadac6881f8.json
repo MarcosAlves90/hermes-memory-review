@@ -1,0 +1,233 @@
+{
+  "schema_version": 6,
+  "kind": "feature",
+  "commit": {
+    "message": "feat(desktop): clarify Magi memory review layout"
+  },
+  "scope": {
+    "allowed_paths": [
+      "desktop/plugin.js",
+      "tests/test_desktop.py"
+    ]
+  },
+  "test_scope": {
+    "allowed_paths": [
+      "tests/test_desktop.py"
+    ]
+  },
+  "development_method": "strict_sdd_tdd_v2",
+  "specification": {
+    "objective": "Make the Magi Desktop Pending Writes and Stored Memory review surfaces easier to scan and safer to interpret without changing Hermes memory semantics.",
+    "requirements": [
+      {
+        "id": "REQ-1",
+        "statement": "Pending review presents a compact, clearly labeled queue summary and concise review guidance with no oversized KPI cards."
+      },
+      {
+        "id": "REQ-2",
+        "statement": "An empty Pending queue has one useful full-width empty state; when search has zero matches, the detail pane does not display an unfiltered or previously selected proposal."
+      },
+      {
+        "id": "REQ-3",
+        "statement": "Replacement operations show current and proposed content side by side at wide widths, stacked on narrow screens, including an explicit unavailable-source placeholder when necessary. Text remains selectable."
+      },
+      {
+        "id": "REQ-4",
+        "statement": "Stored Memory gives compact readable budget context and compaction preview explicitly compares current versus proposed entry and token measurements; labels communicate that applying is a separate write."
+      },
+      {
+        "id": "REQ-5",
+        "statement": "Existing searchable list, approval and deletion confirmations, stale/missing warnings, target switching, native vertical resizing, and Hermes REST contracts remain intact."
+      }
+    ],
+    "acceptance_criteria": [
+      {
+        "id": "AC-1",
+        "statement": "Regression tests prove a consolidated empty Pending state, filter-restricted selection, and compact status summary.",
+        "requirements": [
+          "REQ-1",
+          "REQ-2"
+        ],
+        "proof": "regression"
+      },
+      {
+        "id": "AC-2",
+        "statement": "Regression tests prove responsive labeled before/after replacement rendering, including unavailable current text and selectable content.",
+        "requirements": [
+          "REQ-3"
+        ],
+        "proof": "regression"
+      },
+      {
+        "id": "AC-3",
+        "statement": "Regression tests prove labeled current/proposed compaction statistics and preservation of an explicit Apply action.",
+        "requirements": [
+          "REQ-4",
+          "REQ-5"
+        ],
+        "proof": "regression"
+      },
+      {
+        "id": "AC-4",
+        "statement": "All committed POLIS test and coverage gates, plus Magi plugin validation, pass.",
+        "requirements": [
+          "REQ-5"
+        ],
+        "proof": "regression"
+      }
+    ],
+    "invariants": [
+      {
+        "id": "INV-1",
+        "statement": "Hermes backend owns validation, pending approvals, memory updates and compaction apply; desktop UI uses existing REST routes."
+      },
+      {
+        "id": "INV-2",
+        "statement": "Memory content is rendered as data, with selectable text and no HTML injection."
+      },
+      {
+        "id": "INV-3",
+        "statement": "Desktop styling uses Hermes theme tokens and existing React/SDK primitives with no new dependency."
+      },
+      {
+        "id": "INV-4",
+        "statement": "Existing viewer resize affordances and explicit confirmations are preserved."
+      }
+    ],
+    "forbidden_states": [
+      {
+        "id": "FORBID-1",
+        "statement": "Search with zero matching pending records displays detail or permits approval of a hidden proposal."
+      },
+      {
+        "id": "FORBID-2",
+        "statement": "A missing replacement source is presented as if the prior entry were empty."
+      },
+      {
+        "id": "FORBID-3",
+        "statement": "Compaction preview is automatically applied or appears to have already changed stored entries."
+      },
+      {
+        "id": "FORBID-4",
+        "statement": "Tests and coverage are bypassed by altering the committed POLIS policy."
+      }
+    ],
+    "inputs": [
+      {
+        "id": "IN-1",
+        "statement": "Clean Magi main branch at HEAD 5ad30a0 and current Desktop UI implementation."
+      },
+      {
+        "id": "IN-2",
+        "statement": "Magi existing Hermes Desktop SDK integration, responsive CSS utilities, and committed POLIS strict policy."
+      }
+    ],
+    "outputs": [
+      {
+        "id": "OUT-1",
+        "statement": "Improved Pending Writes, Stored Memory and compaction preview UI in desktop/plugin.js."
+      },
+      {
+        "id": "OUT-2",
+        "statement": "Focused test coverage and validated POLIS Red/Green proof artifacts."
+      }
+    ],
+    "failure_semantics": [
+      {
+        "id": "FAIL-1",
+        "statement": "Missing data is labeled as unavailable; blank search results show no actionable proposal."
+      },
+      {
+        "id": "FAIL-2",
+        "statement": "Existing errors and stale/missing target warnings remain visible without changing persistence behavior."
+      },
+      {
+        "id": "FAIL-3",
+        "statement": "Any invalid POLIS scope, regression oracle, gate or Hermes plugin validation result blocks a completion claim."
+      }
+    ]
+  },
+  "baseline_lock": {
+    "git_object_format": "sha1",
+    "base_commit": "5ad30a0998b6d9ffa98da8525fca153b6773efc4",
+    "base_tree": "cb14b6f25df420874c47dce6cf71633bb4ab65f7",
+    "policy_sha256": "ad0c9c1e2ae90949ee1dfebaa10c98f085ef260284daae61f4fe67d7b95c2529",
+    "specification_sha256": "b3445d1b788776c8ca947c39e3c58b8064974517ce1500e14bf4d9f5d07b327d"
+  },
+  "behavior": {
+    "argv": [
+      "bash",
+      "ci/test.sh"
+    ],
+    "cwd": ".",
+    "timeout_seconds": 300,
+    "environment": {
+      "mode": "clean",
+      "pass": [
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "SystemRoot",
+        "COMSPEC",
+        "PATHEXT",
+        "USERPROFILE",
+        "LOCALAPPDATA"
+      ]
+    }
+  },
+  "affected": {
+    "argv": [
+      "bash",
+      "ci/test.sh"
+    ],
+    "cwd": ".",
+    "timeout_seconds": 300,
+    "environment": {
+      "mode": "clean",
+      "pass": [
+        "PATH",
+        "HOME",
+        "TMPDIR",
+        "TMP",
+        "TEMP",
+        "SystemRoot",
+        "COMSPEC",
+        "PATHEXT",
+        "USERPROFILE",
+        "LOCALAPPDATA"
+      ]
+    }
+  },
+  "regression": {
+    "mode": "red_green",
+    "command": {
+      "argv": [
+        "bash",
+        "ci/test.sh"
+      ],
+      "cwd": ".",
+      "timeout_seconds": 300,
+      "environment": {
+        "mode": "clean",
+        "pass": [
+          "PATH",
+          "HOME",
+          "TMPDIR",
+          "TMP",
+          "TEMP",
+          "SystemRoot",
+          "COMSPEC",
+          "PATHEXT",
+          "USERPROFILE",
+          "LOCALAPPDATA"
+        ]
+      }
+    },
+    "baseline_exit_code": 1,
+    "baseline_output_contains": [
+      "test_pending_review_filter_only_selects_visible_proposals"
+    ]
+  }
+}

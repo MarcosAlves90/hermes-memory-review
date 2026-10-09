@@ -1,0 +1,57 @@
+diff --git a/tests/test_desktop.py b/tests/test_desktop.py
+index 05ee88c665356d64f128fc89e71ca59900a4617a..81934abc1030ce6add87ed41fa4fae4d1581f777 100644
+--- a/tests/test_desktop.py
++++ b/tests/test_desktop.py
+@@ -124,6 +124,52 @@ def test_entry_viewers_are_vertically_resizable():
+     assert "resize-none" not in stored_source
+ 
+ 
++def test_pending_review_filter_only_selects_visible_proposals():
++    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
++    pending = source.split("function PendingWritesPage", 1)[1].split("function StoredMemoryPage", 1)[0]
++
++    assert "const selectedVisible = filtered.some(record => record.id === selected)" in pending
++    assert "const currentId = selectedVisible ? selected : filtered[0]?.id || ''" in pending
++    assert "records[0]?.id" not in pending
++    assert "filtered.length ? jsxs('main'" in pending
++
++
++def test_pending_review_empty_queue_is_single_clear_state_with_compact_summary():
++    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
++    pending = source.split("function PendingWritesPage", 1)[1].split("function StoredMemoryPage", 1)[0]
++
++    assert "'aria-label': 'Pending queue summary'" in pending
++    assert "jsx(StatCard" not in pending
++    assert "records.length === 0 && !listing.isLoading" in pending
++    assert "title: 'Nothing to review'" in pending
++    assert "'Stored memory'" in pending
++
++
++def test_replacement_operations_show_responsive_labeled_before_and_after():
++    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
++    operation = source.split("function OperationCard", 1)[1].split("function OverviewView", 1)[0]
++    content = source.split("function ContentBlock", 1)[1].split("function OperationCard", 1)[0]
++
++    assert "xl:grid-cols-2" in operation
++    assert "label: 'Before · current entry'" in operation
++    assert "label: 'After · proposed replacement'" in operation
++    assert "Original entry unavailable in this proposal" in operation
++    assert "side: 'before'" in operation and "side: 'after'" in operation
++    assert "'data-change-side': side" in content
++
++
++def test_compaction_preview_explicitly_compares_current_and_proposed_statistics():
++    source = (DESKTOP / "plugin.js").read_text(encoding="utf-8")
++    stored = source.split("function StoredMemoryPage", 1)[1].split("function MagiPage", 1)[0]
++
++    assert "label: 'Current · before'" in stored
++    assert "label: 'Proposed · after'" in stored
++    assert "label: 'Estimated reduction'" in stored
++    assert "children: 'Proposed memory entries'" in stored
++    assert "'Apply compaction'" in stored
++    assert "'Cancel preview'" in stored
++
++
+ def test_backend_decisions_do_not_require_chat_session(monkeypatch, tmp_path):
+     stage(
+         tmp_path,
