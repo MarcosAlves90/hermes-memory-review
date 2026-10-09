@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out Magi
+        uses: actions/checkout@f548e57e544e1ff5a4c46bf1e1b8685f8e4a348a # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.14'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@fac544c07dec837d0ccb6301d7b5580bf5edae39 # v8.2.0
+
+      - name: Install pinned Hermes CLI
+        shell: bash
+        env:
+          HERMES_REF: 517b5e10febd619ce30bb22580e29b160266eb43
+        run: |
+          set -euo pipefail
+          hermes_dir="$HOME/.hermes/hermes-agent"
+          mkdir -p "$hermes_dir"
+          git -C "$hermes_dir" init -q
+          git -C "$hermes_dir" remote add origin https://github.com/NousResearch/hermes-agent.git
+          git -C "$hermes_dir" fetch --depth=1 origin "$HERMES_REF"
+          git -C "$hermes_dir" checkout -q --detach FETCH_HEAD
+          uv sync --project "$hermes_dir" --frozen --no-dev --python 3.14
+          echo "$hermes_dir/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Verify Magi
+        run: ./verify.sh
