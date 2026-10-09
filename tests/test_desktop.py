@@ -1,9 +1,12 @@
 import importlib.util
 import json
+import os
+import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -382,23 +385,33 @@ class FakeMemoryStore:
         entries.remove(matched_entry)
         return {"success": True, "message": "Entry removed.", "previous_content": matched_entry}
 
+    def _mutate(self, target, mutate, *, skip_drift=False):
+        entries = self.memory_entries if target == "memory" else self.user_entries
+        result = mutate(entries, self._char_limit(target))
+        if isinstance(result, dict):
+            return result
+        if target == "memory":
+            self.memory_entries = result[0]
+        else:
+            self.user_entries = result[0]
+        return {"success": True, "message": result[1]}
+
     def apply_batch(self, target, operations):
         self.batch_calls.append((target, operations))
         if self.batch_result is not None:
             return self.batch_result
-        entries = self.memory_entries if target == "memory" else self.user_entries
-        working = list(entries)
-        for operation in operations:
-            if operation["action"] == "remove":
-                working.remove(operation["matched_entry"])
-            elif operation["action"] == "add":
-                if operation["content"] not in working:
-                    working.append(operation["content"])
-        if target == "memory":
-            self.memory_entries = working
-        else:
-            self.user_entries = working
-        return {"success": True, "message": "Applied compaction."}
+
+        def apply(entries, limit):
+            working = list(entries)
+            for operation in operations:
+                if operation["action"] == "remove":
+                    working.remove(operation["matched_entry"])
+                elif operation["action"] == "add":
+                    if operation["content"] not in working:
+                        working.append(operation["content"])
+            return working, "Applied compaction."
+
+        return self._mutate(target, apply)
 
 
 def test_backend_marks_pending_write_obsolete_when_pinned_target_is_missing(monkeypatch, tmp_path):
@@ -752,6 +765,100 @@ def test_backend_rejects_stale_compaction_without_mutation(monkeypatch):
     assert response.status_code == 409
     assert store.batch_calls == []
     assert store.memory_entries == ["newer memory"]
+
+
+def test_backend_rejects_concurrent_add_during_native_batch_lock(monkeypatch):
+    api = load_api()
+
+    class ConcurrentMemoryStore(FakeMemoryStore):
+        def _mutate(self, target, mutate, *, skip_drift=False):
+            # Hermes reloads the file after taking its exclusive lock. Model a
+            # second process that appended memory after Magi's initial read.
+            self.memory_entries.append("new fact from concurrent writer")
+            return super()._mutate(target, mutate, skip_drift=skip_drift)
+
+    store = ConcurrentMemoryStore(memory=["old first", "old second"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    fingerprint = api._source_fingerprint(list(store.memory_entries))
+
+    response = client_for(api).post(
+        "/memory/memory/compact",
+        json={"source_fingerprint": fingerprint, "entries": ["old first; old second"]},
+    )
+
+    assert response.status_code == 409
+    assert "changed" in str(response.json()).lower()
+    assert store.memory_entries == ["old first", "old second", "new fact from concurrent writer"]
+
+
+def test_compaction_uses_native_hermes_disk_transaction_and_rejects_concurrent_changes(monkeypatch, tmp_path):
+    """Test native on-disk Hermes separately from conftest's Hermes stubs."""
+    hermes_root = Path.home() / ".hermes" / "hermes-agent"
+    if not (hermes_root / "tools" / "memory_tool_store.py").is_file():
+        pytest.skip("Native Hermes checkout is not installed")
+    code = '''
+import importlib.util
+import os
+import sys
+from pathlib import Path
+
+sys.path.insert(0, os.environ["HERMES_NATIVE_ROOT"])
+import hermes_bootstrap  # noqa: F401
+from tools import memory_tool
+from tools.memory_tool_store import MemoryStore
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+memory_dir = Path(os.environ["HERMES_HOME"]) / "isolated-memory"
+memory_tool.get_memory_dir = lambda: memory_dir
+writer = MemoryStore()
+writer.load_from_disk()
+assert writer.add("memory", "old first")["success"]
+assert writer.add("memory", "old second")["success"]
+
+api_path = Path(os.environ["MAGI_REPO_ROOT"]) / "dashboard" / "plugin_api.py"
+spec = importlib.util.spec_from_file_location("native_hermes_magi_api", api_path)
+api = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = api
+spec.loader.exec_module(api)
+store = MemoryStore()
+store.load_from_disk()
+api._memory_store = lambda: store
+app = FastAPI()
+app.include_router(api.router)
+client = TestClient(app)
+original = api._source_fingerprint(list(store.memory_entries))
+
+# A separate native MemoryStore writes after Magi's first fingerprint check.
+native_mutate = store._mutate
+def write_before_native_lock(target, mutation, *, skip_drift=False):
+    assert writer.add("memory", "concurrent third fact")["success"]
+    return native_mutate(target, mutation, skip_drift=skip_drift)
+store._mutate = write_before_native_lock
+response = client.post("/memory/memory/compact", json={
+    "source_fingerprint": original, "entries": ["merged first and second"]})
+assert response.status_code == 409, response.text
+disk = MemoryStore()
+disk.load_from_disk()
+assert disk.memory_entries == ["old first", "old second", "concurrent third fact"]
+
+del store._mutate
+store.load_from_disk()
+refreshed = api._source_fingerprint(list(store.memory_entries))
+response = client.post("/memory/memory/compact", json={
+    "source_fingerprint": refreshed, "entries": ["merged first, second and third"]})
+assert response.status_code == 200, response.text
+disk.load_from_disk()
+assert disk.memory_entries == ["merged first, second and third"]
+assert "_mutate" not in vars(store)
+'''
+    env = {**os.environ, "HERMES_HOME": str(tmp_path),
+           "HERMES_NATIVE_ROOT": str(hermes_root), "MAGI_REPO_ROOT": str(ROOT)}
+    result = subprocess.run(
+        ["uv", "run", "--with", "fastapi>=0.115,<1", "--with", "httpx>=0.27,<1", "python", "-c", code],
+        cwd=ROOT, env=env, capture_output=True, text=True, timeout=45, check=False,
+    )
+    assert result.returncode == 0, result.stderr
 
 
 def test_backend_surfaces_compaction_batch_failure_without_partial_write(monkeypatch):

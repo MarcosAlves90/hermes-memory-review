@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.7.7 — 2026-10-08
+
+- Closed a compaction race where another Hermes writer could add a memory entry
+  after Magi checked the preview fingerprint but before native `apply_batch`
+  reloaded the disk under its exclusive lock. Stale previews now abort within
+  that locked mutation before any new compacted entries are written.
+- Added regression coverage for an intervening writer, plus disk-backed native
+  Hermes integration proving a rejected stale preview preserves every entry
+  and a refreshed preview commits successfully.
+
 ## 1.7.6 — 2026-10-08
 
 - Removed the model-facing `maxItems` schema constraint so Hermes' own

@@ -1,11 +1,11 @@
-# Magi 1.7.6
+# Magi 1.7.7
 
 Hermes plugin for reviewing pending memory proposals and maintaining the
 built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
 
 ## Desktop
 
-Version 1.7.6 provides a native **Magi** workspace in Hermes Desktop. After the
+Version 1.7.7 provides a native **Magi** workspace in Hermes Desktop. After the
 plugin is installed, enable both halves independently:
 
 1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
@@ -84,9 +84,10 @@ and reports before/after entry counts, percentage reduction, token estimate, and
 model attribution.
 Preview generation runs through the plugin backend and does not require an open,
 active, or focused chat session.
-Nothing is written until **Apply compaction** is selected. Applying verifies that
-the source entries have not changed since the preview and then performs one
-atomic `MemoryStore.apply_batch()` update.
+Nothing is written until **Apply compaction** is selected. Applying verifies the
+source fingerprint both before submission and inside Hermes' locked disk-reload
+transaction, then performs one atomic `MemoryStore.apply_batch()` update. Any
+intervening memory change rejects the preview without writing its proposal.
 
 ## Commands
 
@@ -186,9 +187,10 @@ calls `ctx.llm.complete_structured()`. Magi passes the optional configured
 an empty setting keeps Hermes' active/default model. Hermes enforces its plugin LLM
 override permission and allowlist before any explicit model can run.
 The preview carries a fingerprint of the exact source entries. The compact POST
-route rejects a stale fingerprint and delegates the complete consolidation to a
-single `MemoryStore.apply_batch()` transaction; failed validation leaves the
-store unchanged.
+route rejects stale fingerprints inside Hermes' native `_mutate` lock using a
+transaction-scoped callback before `MemoryStore.apply_batch()` persists the
+consolidation. This depends on Hermes' current private `_mutate` hook; native
+integration tests cover its behavior against synthetic disk-backed stores.
 
 The equivalent native commands are:
 
@@ -199,6 +201,6 @@ The equivalent native commands are:
 
 ## Validation
 
-Version 1.7.6 targets Hermes `>=0.21.5` and passes the repository verification
+Version 1.7.7 targets Hermes `>=0.21.5` and passes the repository verification
 suite: complete tests, Cobertura
 coverage above 95%, and Hermes plugin validation.
