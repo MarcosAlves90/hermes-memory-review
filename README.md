@@ -1,97 +1,45 @@
-# Magi 1.7.7
+# Magi
 
-Hermes plugin for reviewing pending memory proposals and maintaining the
-built-in Hermes `MEMORY.md` and `USER.md` stores from Hermes Desktop.
+Magi is a Hermes plugin for reviewing pending memory writes and managing the built-in `MEMORY.md` and `USER.md` stores in Hermes Desktop. Requires Hermes `>=0.21.5`.
 
-## Desktop
+![Magi cover banner](docs/magi-cover-banner.png)
 
-Version 1.7.7 provides a native **Magi** workspace in Hermes Desktop. After the
-plugin is installed, enable both halves independently:
+## Install
 
-1. Enable the Agent plugin for the active profile under **Capabilities → Plugins**.
-2. Enable the Desktop **Magi** plugin in the same Plugins screen.
-3. Open **Magi** from the Desktop sidebar.
+```bash
+hermes plugins install https://github.com/MarcosAlves90/magi
+hermes plugins enable magi
+```
 
-![Magi pending-review dashboard](docs/screenshots/magi-dashboard.png)
+In Hermes Desktop, go to **Capabilities → Plugins** and enable both the **Agent** plugin for your active profile and the **Desktop Magi** plugin. These switches are independent. If Desktop was already open, choose **Rescan** first. Then open **Magi** from the sidebar.
 
-Use the compact workspace switch to alternate between **Pending writes** and
-**Stored memory**. The dashboard is organized around task state rather than raw
-records: queue/budget metrics stay visible, actions are contextual, search reports
-its filtered count, selected records are visually distinct, and loading/empty/error
-states explain the next useful action. Short 100–150 ms transitions, fade-ins,
-progress movement, and loading pulses provide feedback without an animation library;
-reduced-motion preferences disable transition motion.
+## Use Magi in Desktop
 
-Pending writes open on a formatted **Overview** with proposal status, metadata,
-intent, and readable operation cards. **Proposal**, **Diff**, **Raw**, and **Verify**
-remain available for deeper inspection. Text in all five inspection views is
-selectable, so standard copy shortcuts work directly from the review pane. The
-inspection area can also be resized vertically from its lower edge/corner while
-keeping long content internally scrollable. Queue
-health shows total, ready, and attention-required proposals; obsolete/unverifiable
-items are visually distinct. Each pending write can be approved or rejected in place;
-**Approve all** and **Reject all** require an explicit confirmation click. It
-polls every five seconds so changes remain visible even when a live plugin socket
-is unavailable. Approval and rejection run through the plugin backend and do not
-require an open, active, or focused Hermes chat session. Pending replace/remove
-proposals are also checked against the current stored entries. If a pinned target
-has already been deleted, the proposal
-is marked obsolete, approval is disabled, and **Delete obsolete** rejects/removes
-the stale proposal through Hermes' native memory decision path.
+![Magi memory review dashboard](docs/screenshots/magi-dashboard.png)
 
-**Stored memory** exposes separate **Memory** (`MEMORY.md`) and **User** (`USER.md`)
-views with entry count, character usage, estimated tokens, free capacity, and a live
-budget bar. Every stored entry is listed with its size and is searchable. Select an
-entry, edit its complete text in a vertically resizable editor, and choose **Save changes** to replace that exact entry;
-the editor distinguishes saved, unsaved, and externally stale states.
-Use **Add entry** to create a new entry in the active target. **Delete entry** uses
-a second **Confirm delete** click before removing the selected exact entry.
-The backend delegates the write to Hermes' own `MemoryStore`, so locking, limits,
-content scanning, drift detection, and atomic persistence remain enforced by
-Hermes. Both targets also show exact character usage against the active profile's
-configured `memory_char_limit` / `user_char_limit`, plus the equivalent approximate
-token usage using Hermes' documented memory-budget scale of 2.75 chars/token. The
-percentage is based on the exact character limit that Hermes actually enforces.
+- **Pending writes:** Review each proposal using **Overview**, **Proposal**, **Diff**, **Raw**, or **Verify**, then approve or reject it. Bulk actions require confirmation. Proposals targeting entries that no longer exist are marked obsolete and can be removed with **Delete obsolete**.
+- **Stored memory:** Switch between **Memory** (`MEMORY.md`) and **User** (`USER.md`). Search entries, inspect usage and remaining capacity, and add or edit entries. Deletion requires confirmation.
+- **Resizable views:** Drag the lower edge of the pending-write inspector or stored-memory editor to change its height.
+- **AI compaction:** Select a store and choose **Compact with AI** to review a proposed shorter version. Magi accepts a preview only if it uses at most 60% of the original characters (at least a 40% reduction); it can retry up to three times. If no safe reduction is available, the memory stays unchanged. Nothing is written until you choose **Apply compaction**. If the source changes after preview, the apply is rejected.
 
-Choose **Compact with AI** on either target to ask the configured compaction model,
-or Hermes' active/default model when `compaction_model` is empty, for a leaner
-representation. An explicit model selection is still subject to Hermes' plugin LLM
-trust policy: `plugins.entries.magi.llm.allow_model_override` must be enabled and
-the model must satisfy any configured `allowed_models` restriction. The model receives the current entries as one untrusted
-memory corpus and is explicitly told not to preserve source entry boundaries. It
-extracts the durable, actionable core, merges related facts into a small number of
-thematic entries, and removes examples, explanations, narrative history, temporary
-status, repeated qualifiers, and low-value nuance that would not change a future
-answer or action. The entry count is capped by Magi after parsing rather than by
-JSON Schema `maxItems`, because Hermes can reject schema violations before Magi
-can retry. The invariant compaction policy is sent through Hermes'
-supported `system_prompt` channel, while the stored memory remains lower-authority
-input data. Magi makes up to three passes, each with the same hard acceptance
-budget of 60% of the original footprint (at least 40% reduction); preferred targets
-tighten from 40% to 30% and finally 22%. Valid, shorter candidates can be carried
-into later passes; structurally invalid proposals are discarded and retried from
-the last valid input. Retries explicitly challenge premature claims that no further safe
-compression is possible. Only the final pass may return `cannot_compact_further`,
-and only when further shortening would lose material durable information. In that
-case Magi reports an informational "no change" result with the model's reason and
-leaves memory untouched instead of surfacing a generic budget failure. The plugin
-also validates the output entry count itself after the LLM returns: if a
-provider/model returns too many entries, the proposal is retried rather than shown;
-Hermes schema-validation failures are retried too. Repeated violations fail closed
-without changing memory. While generation is running, Desktop shows an activity indicator and
-live elapsed time. The review panel is height-bounded with its own scrolling area,
-and reports before/after entry counts, percentage reduction, token estimate, and
-model attribution.
-Preview generation runs through the plugin backend and does not require an open,
-active, or focused chat session.
-Nothing is written until **Apply compaction** is selected. Applying verifies the
-source fingerprint both before submission and inside Hermes' locked disk-reload
-transaction, then performs one atomic `MemoryStore.apply_batch()` update. Any
-intervening memory change rejects the preview without writing its proposal.
+Pending-write decisions and compaction previews work without an open chat session. Stored-memory changes use Hermes' native memory safeguards, including checks against stale data.
+
+## Configuration
+
+Set these options in the Magi plugin settings:
+
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `compaction_model` | Empty | Model for AI compaction; empty uses the active/default Hermes model. |
+| `home_override` | Empty | Optional custom Hermes home directory; empty uses the active profile. |
+| `default_page_size` | `20` | Default number of pending writes listed. |
+| `max_page_size` | `100` | Maximum number of list/search results. |
+
+Choosing a specific `compaction_model` requires Hermes permission `plugins.entries.magi.llm.allow_model_override` and compliance with any configured `allowed_models` restriction.
 
 ## Commands
 
-Session:
+In a Hermes session:
 
 ```text
 /magi list [page] [limit]
@@ -106,7 +54,7 @@ Session:
 /memory-compact-preview <memory|user>
 ```
 
-Terminal:
+From the terminal:
 
 ```bash
 hermes magi list
@@ -116,91 +64,21 @@ hermes magi raw <id> | less
 hermes magi verify all
 ```
 
-Use the terminal form for very large payloads because messaging platforms may
-impose their own message limits.
+Use the terminal for large records that may exceed chat message limits.
 
-## Install
+## Security and privacy
 
-```bash
-hermes plugins install https://github.com/MarcosAlves90/magi
-hermes plugins enable magi
-```
+- **Local reads:** Magi reads the active profile's pending-memory records and Hermes' `MEMORY.md` / `USER.md` stores. `home_override` can redirect these reads to a home directory you select.
+- **Changes:** Approval, rejection, entry edits and compaction require explicit user actions. Writes go through Hermes' native memory APIs; Magi does not edit the stores directly.
+- **AI access:** Compaction sends the selected memory content through Hermes' `ctx.llm` interface to the configured model/provider. Hermes owns provider credentials; Magi does not read or store them.
+- **Other activity:** Magi makes no direct third-party network calls, launches no shell commands or subprocesses, runs no long-lived background jobs, and collects no telemetry or usage data. While its Desktop page is open, it polls the local plugin backend every five seconds.
 
-For Desktop, use **Capabilities → Plugins → Rescan** if the app was already
-open, then enable the Desktop half separately. Hermes keeps the Agent and
-Desktop enable switches independent by design.
+## Development
 
-## Local verification
+Run the repository verification suite:
 
 ```bash
 ./verify.sh
 ```
 
-This checks Python syntax, runs the test suite, and enforces Cobertura line
-coverage above 95%, then runs the same `hermes plugins validate --install-deps`
-admission check used by the Hermes catalog. Test dependencies are isolated by
-`uv`; the installed plugin itself uses Hermes plus the Python standard library.
-
-POLIS workflow artifacts use repository retention through
-`.polis/artifact-retention.json`. Locked Change Contracts are therefore copied to
-`.polis/artifacts/contracts/` and can be resumed with `polis status` from the
-repository checkout. The retained contract introduced with this setup starts from
-its own locked baseline; it does not retroactively establish strict-development
-proof for Magi changes committed before that baseline.
-
-## Catalog disclosures
-
-Magi reads the active Hermes profile's staged pending-memory records and the built-in `MEMORY.md` / `USER.md` stores in order to render its review and maintenance UI. The optional `home_override` setting can point Magi at another Hermes home/profile path selected by the user.
-
-Memory changes happen only after an explicit user action in Magi. Approve/reject operations and stored-memory add/edit/delete/compaction writes are delegated to Hermes' native memory APIs and safeguards rather than rewriting the built-in stores directly.
-
-Magi makes no direct third-party network requests, runs no shell commands or subprocesses at runtime, starts no long-running background process, and emits no telemetry or usage reporting. While the Desktop page is open it polls Magi's local profile-scoped backend every five seconds for UI freshness.
-
-AI compaction uses Hermes' `ctx.llm` surface. The optional `compaction_model`
-setting selects a model through Hermes' trust-gated model override; when left empty,
-Hermes uses the user's active/default model. Provider selection and credentials stay
-owned by Hermes, and Magi does not read, persist, refresh, or otherwise manage them.
-
-## Mutation paths
-
-For pending proposals, the backend reads JSON records under the active profile's
-`pending/memory` directory. Desktop approve/reject buttons do not edit those
-files directly. They call the plugin's profile-scoped REST backend, which replays
-approved writes through `tools.memory_tool.apply_memory_pending()` and removes
-rejected or successfully applied pending records. This preserves Hermes' pinned-entry
-approval semantics without routing through a session-bound slash command.
-
-For stored memory, the plugin backend exposes profile-scoped `GET /memory`,
-`PUT /memory/{target}`, `POST /memory/{target}/compact/preview`, and
-`POST /memory/{target}/compact` routes. The GET route
-reports Hermes' rough token estimate for each target. The PUT route loads Hermes'
-on-disk store with
-`tools.memory_tool.load_on_disk_store()` and calls `MemoryStore.replace()` with
-the complete original entry pinned as the reviewed match. The plugin never
-rewrites `MEMORY.md` or `USER.md` directly, so a stale, invalid, over-budget, or
-blocked replacement is rejected by Hermes instead of silently overwriting newer
-state.
-
-AI preview generation reuses the Agent plugin's bound context from the backend and
-calls `ctx.llm.complete_structured()`. Magi passes the optional configured
-`compaction_model` as a model override while leaving provider selection untouched;
-an empty setting keeps Hermes' active/default model. Hermes enforces its plugin LLM
-override permission and allowlist before any explicit model can run.
-The preview carries a fingerprint of the exact source entries. The compact POST
-route rejects stale fingerprints inside Hermes' native `_mutate` lock using a
-transaction-scoped callback before `MemoryStore.apply_batch()` persists the
-consolidation. This depends on Hermes' current private `_mutate` hook; native
-integration tests cover its behavior against synthetic disk-backed stores.
-
-The equivalent native commands are:
-
-```text
-/memory approve <id>
-/memory reject <id>
-```
-
-## Validation
-
-Version 1.7.7 targets Hermes `>=0.21.5` and passes the repository verification
-suite: complete tests, Cobertura
-coverage above 95%, and Hermes plugin validation.
+This checks Python syntax, runs tests with more than 95% line coverage, and validates the plugin with Hermes' `plugins validate --install-deps` admission check. Compaction apply currently depends on Hermes' private `_mutate` interface; revalidate compatibility after Hermes upgrades.
