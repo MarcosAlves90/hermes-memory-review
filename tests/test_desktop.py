@@ -442,12 +442,14 @@ class FakeMemoryStore:
             self.user_entries = result[0]
         return {"success": True, "message": result[1]}
 
-    def apply_batch(self, target, operations):
-        self.batch_calls.append((target, operations))
+    def apply_batch(self, target, operations, *, expected_entries=None):
+        self.batch_calls.append((target, operations, expected_entries))
         if self.batch_result is not None:
             return self.batch_result
 
         def apply(entries, limit):
+            if expected_entries is not None and list(entries) != list(expected_entries):
+                return {"success": False, "error": "Stored memory changed since the reviewed snapshot."}
             working = list(entries)
             for operation in operations:
                 if operation["action"] == "remove":
@@ -837,8 +839,9 @@ def test_backend_applies_compaction_as_one_stale_safe_batch(monkeypatch):
 
     assert response.status_code == 200
     assert len(store.batch_calls) == 1
-    target, operations = store.batch_calls[0]
+    target, operations, expected_entries = store.batch_calls[0]
     assert target == "memory"
+    assert expected_entries == ["first fact", "second fact"]
     assert operations == [
         {"action": "remove", "old_text": "first fact", "matched_entry": "first fact"},
         {"action": "remove", "old_text": "second fact", "matched_entry": "second fact"},
@@ -897,6 +900,25 @@ def test_backend_rejects_stale_compaction_without_mutation(monkeypatch):
     assert response.status_code == 409
     assert store.batch_calls == []
     assert store.memory_entries == ["newer memory"]
+
+
+def test_backend_refuses_compaction_on_older_hermes_without_atomic_precondition(monkeypatch):
+    api = load_api()
+
+    class LegacyMemoryStore(FakeMemoryStore):
+        def apply_batch(self, target, operations):
+            raise AssertionError("Old unconditional API must never be called")
+
+    store = LegacyMemoryStore(memory=["old first", "old second"])
+    monkeypatch.setattr(api, "_memory_store", lambda: store)
+    response = client_for(api).post(
+        "/memory/memory/compact",
+        json={"source_fingerprint": api._source_fingerprint(store.memory_entries),
+              "entries": ["old facts"]},
+    )
+    assert response.status_code == 409
+    assert "Upgrade Hermes" in str(response.json())
+    assert store.memory_entries == ["old first", "old second"]
 
 
 def test_backend_rejects_concurrent_add_during_native_batch_lock(monkeypatch):

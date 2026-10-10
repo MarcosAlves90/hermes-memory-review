@@ -29,16 +29,17 @@ jobs:
         with:
           enable-cache: false
 
+      # Temporary fork pin while upstream PR #135901 is under review.
       - name: Install pinned Hermes CLI
         shell: bash
         env:
-          HERMES_REF: 517b5e10febd619ce30bb22580e29b160266eb43
+          HERMES_REF: 914df5f6ddb5a2813f779d78d7eb8778e3fd5b35
         run: |
           set -euo pipefail
           hermes_dir="$HOME/.hermes/hermes-agent"
           mkdir -p "$hermes_dir"
           git -C "$hermes_dir" init -q
-          git -C "$hermes_dir" remote add origin https://github.com/NousResearch/hermes-agent.git
+          git -C "$hermes_dir" remote add origin https://github.com/MarcosAlves90/hermes-agent.git
           git -C "$hermes_dir" fetch --depth=1 origin "$HERMES_REF"
           git -C "$hermes_dir" checkout -q --detach FETCH_HEAD
           uv sync --project "$hermes_dir" --frozen --no-dev --python 3.14
