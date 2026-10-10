@@ -15,7 +15,6 @@ def load_plugin():
     sys.modules.pop(name, None)
     sys.modules.pop(name + ".core", None)
     sys.modules.pop(name + ".runtime_bridge", None)
-    sys.modules.pop("_magi_runtime_bridge", None)
     spec = importlib.util.spec_from_file_location(
         name,
         PLUGIN_DIR / "__init__.py",
@@ -64,7 +63,8 @@ def test_registers_supported_commands(tmp_path):
     assert ctx.commands["magi"]["argument_mode"] == "text"
     assert "<id" in ctx.commands["memory-show"]["args_hint"]
     assert "memory|user" in ctx.commands["memory-compact-preview"]["args_hint"]
-    bridge = sys.modules["_magi_runtime_bridge"]
+    bridge = sys.modules[plugin.__name__ + ".runtime_bridge"]
+    assert "_magi_runtime_bridge" not in sys.modules
     assert bridge.get_plugin_llm() is ctx.llm
     assert len(ctx.unload_callbacks) == 1
     ctx.unload_callbacks[0]()
@@ -572,3 +572,8 @@ def test_setup_cli_and_cli_handler(tmp_path, capsys):
     handler(ns)
     out = capsys.readouterr().out
     assert "Valid records: 0" in out
+
+
+def test_manifest_declares_optional_model_override_for_hermes_consent():
+    manifest = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
+    assert "capabilities:\n  - llm.model_override\n" in manifest

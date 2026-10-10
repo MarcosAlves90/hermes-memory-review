@@ -22,7 +22,7 @@ In Hermes Desktop, go to **Capabilities → Plugins** and enable both the **Agen
 - **Resizable views:** Drag the lower edge of the pending-write inspector or stored-memory editor to change its height.
 - **AI compaction:** Select a store and choose **Compact with AI** to review a proposed shorter version. Magi accepts a preview only if it uses at most 60% of the original characters (at least a 40% reduction); it can retry up to three times. If no safe reduction is available, the memory stays unchanged. Nothing is written until you choose **Apply compaction**. If the source changes after preview, the apply is rejected.
 
-Pending-write decisions and compaction previews work without an open chat session. Stored-memory changes use Hermes' native memory safeguards, including checks against stale data.
+Pending-write decisions and compaction previews work without an open chat session. Stored-memory changes use Hermes' native memory safeguards, including checks against stale data. Applying AI compaction additionally requires the native conditional-batch API (`MemoryStore.apply_batch(expected_entries=...)`, proposed in [Hermes PR #135901](https://github.com/NousResearch/hermes-agent/pull/135901)). Older Hermes versions refuse Apply without modifying memory; pending review and manual stored-memory edits remain available.
 
 ## Configuration
 
@@ -35,7 +35,7 @@ Set these options in the Magi plugin settings:
 | `default_page_size` | `20` | Default number of pending writes listed. |
 | `max_page_size` | `100` | Maximum number of list/search results. |
 
-Choosing a specific `compaction_model` requires Hermes permission `plugins.entries.magi.llm.allow_model_override` and compliance with any configured `allowed_models` restriction.
+Choosing a specific `compaction_model` requires operator consent to Magi's declared `llm.model_override` capability (or the equivalent explicit Hermes permission `plugins.entries.magi.llm.allow_model_override`). Hermes also enforces any configured `allowed_models` restriction. The configured value is passed literally as `model=` to `ctx.llm` on Hermes' **active provider**; a `provider/model`-shaped string does not automatically switch providers.
 
 ## Commands
 
@@ -81,4 +81,4 @@ Run the repository verification suite:
 ./verify.sh
 ```
 
-This checks Python syntax, runs tests with more than 95% line coverage, and validates the plugin with Hermes' `plugins validate --install-deps` admission check. Compaction apply currently depends on Hermes' private `_mutate` interface; revalidate compatibility after Hermes upgrades.
+This checks Python syntax, runs tests with more than 95% line coverage, and validates the plugin with Hermes' `plugins validate --install-deps` admission check. Compaction apply requires Hermes' public conditional `MemoryStore.apply_batch(expected_entries=...)` interface. The minimum supported Hermes version for other Magi operations remains `>=0.21.5`; on older versions without the conditional API, compaction Apply is disabled to preserve stale-preview safety.
