@@ -33,7 +33,6 @@ router = APIRouter()
 
 _MEMORY_CHARS_PER_TOKEN = 2.75
 _TOKEN_ESTIMATE_METHOD = "hermes_memory_budget_2.75_chars_per_token"
-_RUNTIME_BRIDGE_ALIAS = "_magi_runtime_bridge"
 
 
 class MemoryEditRequest(BaseModel):
@@ -171,12 +170,25 @@ def _apply_compaction_batch(store: Any, target: str, operations: List[Dict[str, 
 
 
 def _plugin_llm() -> Any:
-    bridge = sys.modules.get(_RUNTIME_BRIDGE_ALIAS)
-    if bridge is None:
+    """Find the Agent-owned bridge without altering the Hermes module registry.
+
+    Hermes loads the Agent and Desktop backend under separate module names in
+    the same profile host. The bridge has one owner: the Agent's package.
+    Require an unambiguous module with the exact file path for this plugin;
+    never select another profile or an unrelated plugin by name alone.
+    """
+    bridge_path = (_PLUGIN_ROOT / "runtime_bridge.py").resolve()
+    bridges = [
+        module for name, module in tuple(sys.modules.items())
+        if name.endswith(".runtime_bridge")
+        and getattr(module, "__file__", None)
+        and Path(module.__file__).resolve() == bridge_path
+    ]
+    if len(bridges) != 1:
         raise RuntimeError(
-            "Magi Agent context is unavailable; enable the Agent plugin for this profile."
+            "Magi Agent context is unavailable or ambiguous; enable the Agent plugin for this profile."
         )
-    return bridge.get_plugin_llm()
+    return bridges[0].get_plugin_llm()
 
 
 def _memory_target(store: Any, target: str) -> Dict[str, Any]:

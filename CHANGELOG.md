@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Declared the optional `llm.model_override` capability so Hermes can request and audit operator consent when a compaction model is configured.
+- Removed the global `sys.modules` alias used by the Agent/Desktop LLM bridge; backend discovery now reads only the plugin-owned module and fails closed on ambiguity or unload.
 
 ## 1.7.7 — 2026-10-08
 

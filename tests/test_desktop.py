@@ -721,6 +721,55 @@ def test_desktop_dashboard_uses_lightweight_reactive_ui_patterns():
     assert "lottie" not in source
 
 
+def test_backend_compaction_resolves_agent_bridge_without_global_alias(monkeypatch):
+    """Model the two real Hermes imports sharing one isolated plugin host."""
+    plugin_name = "hermes_plugins_magi_host_test"
+    spec = importlib.util.spec_from_file_location(
+        plugin_name, ROOT / "__init__.py",
+        submodule_search_locations=[str(ROOT)],
+    )
+    plugin = importlib.util.module_from_spec(spec)
+    sys.modules[plugin_name] = plugin
+    callbacks = []
+    llm = FakeCompactionLlm(["first fact; second fact with detail"])
+
+    class HostContext:
+        def __init__(self):
+            self.llm = llm
+
+        def register_command(self, *args, **kwargs):
+            pass
+
+        def register_cli_command(self, *args, **kwargs):
+            pass
+
+        def on_unload(self, callback):
+            callbacks.append(callback)
+
+    try:
+        spec.loader.exec_module(plugin)
+        plugin.register(HostContext())
+        assert "_magi_runtime_bridge" not in sys.modules
+        api = load_api()
+        assert api._plugin_llm() is llm
+        monkeypatch.setattr(api, "_memory_store", lambda: FakeMemoryStore(memory=[
+            "The first durable fact is first fact with unnecessary explanatory wording.",
+            "The second durable fact is second fact with detail and repeated explanatory wording.",
+        ]))
+        monkeypatch.setattr(api, "_settings", lambda: {})
+        response = client_for(api).post("/memory/memory/compact/preview")
+        assert response.status_code == 200
+        assert response.json()["success"] is True
+        assert len(llm.calls) == 1
+        callbacks[0]()
+        with pytest.raises(RuntimeError, match="Agent context is unavailable"):
+            api._plugin_llm()
+    finally:
+        for name in list(sys.modules):
+            if name == plugin_name or name.startswith(plugin_name + "."):
+                sys.modules.pop(name, None)
+
+
 def test_backend_generates_compaction_preview_without_a_chat_session(monkeypatch):
     api = load_api()
     store = FakeMemoryStore(
