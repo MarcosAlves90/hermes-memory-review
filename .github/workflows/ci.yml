@@ -49,7 +49,7 @@ jobs:
       - name: Verify conditional memory batches in Hermes
         run: |
           hermes_dir="$HOME/.hermes/hermes-agent"
-          uv run --project "$hermes_dir" --frozen --with 'pytest>=8,<10' \\
+          uv run --project "$hermes_dir" --frozen --with 'pytest>=8,<10' \
             python -m pytest -q "$hermes_dir/tests/tools/test_memory_tool.py" -k conditional_batch
 
       - name: Verify Magi
