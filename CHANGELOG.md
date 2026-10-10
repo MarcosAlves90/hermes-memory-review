@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Declared the optional `llm.model_override` capability so Hermes can request and audit operator consent when a compaction model is configured.
+
 ## 1.7.7 — 2026-10-08
 
 - Closed a compaction race where another Hermes writer could add a memory entry

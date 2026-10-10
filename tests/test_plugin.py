@@ -572,3 +572,8 @@ def test_setup_cli_and_cli_handler(tmp_path, capsys):
     handler(ns)
     out = capsys.readouterr().out
     assert "Valid records: 0" in out
+
+
+def test_manifest_declares_optional_model_override_for_hermes_consent():
+    manifest = (ROOT / "plugin.yaml").read_text(encoding="utf-8")
+    assert "capabilities:\n  - llm.model_override\n" in manifest
