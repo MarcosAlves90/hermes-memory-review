@@ -35,7 +35,7 @@ Set these options in the Magi plugin settings:
 | `default_page_size` | `20` | Default number of pending writes listed. |
 | `max_page_size` | `100` | Maximum number of list/search results. |
 
-Choosing a specific `compaction_model` requires operator consent to Magi's declared `llm.model_override` capability (or the equivalent explicit Hermes permission `plugins.entries.magi.llm.allow_model_override`). Hermes also enforces any configured `allowed_models` restriction.
+Choosing a specific `compaction_model` requires operator consent to Magi's declared `llm.model_override` capability (or the equivalent explicit Hermes permission `plugins.entries.magi.llm.allow_model_override`). Hermes also enforces any configured `allowed_models` restriction. The configured value is passed literally as `model=` to `ctx.llm` on Hermes' **active provider**; a `provider/model`-shaped string does not automatically switch providers.
 
 ## Commands
 
