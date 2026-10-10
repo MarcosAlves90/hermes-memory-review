@@ -17,7 +17,7 @@ This document distinguishes implemented checks from upstream dependencies. A gre
 ## Integration and validation evidence
 
 - [Magi CI run 38012329440](https://github.com/MarcosAlves90/magi/actions/runs/38012329440): 85 tests passed, 96.05% line coverage, plugin admission validation passed at `de3ca189` (against Hermes fork commit `914df5f`).
-- [Magi CI run 38012639732](https://github.com/MarcosAlves90/magi/actions/runs/38012639732): targeted Hermes conditional-batch test step passed; the full workflow result must be checked for the exact final head.
+- [Magi CI run 38012639732](https://github.com/MarcosAlves90/magi/actions/runs/38012639732), code commit `0e0622d9`: passed. Includes 2 native Hermes conditional-batch tests, 85 Magi tests, 96.05% line coverage and plugin validation. These results apply to the stated commit; later document-only commits require separate CI confirmation.
 - Upstream Hermes PR Actions are currently `action_required`, requiring maintainer approval; no upstream CI pass is claimed.
 - The prior local Hermes test result (81 passed, 95.99%) applies only to the earlier Magi `498920e` main commit, and does not validate this draft branch.
 
